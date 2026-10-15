@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.vercel/
+.private/
+*.p12
+*.jks
+*.keystore
+android/.gradle/
+android/**/build/
+android/local.properties
+preview.jpg
+*.log
