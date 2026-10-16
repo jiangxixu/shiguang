@@ -14,6 +14,8 @@ async function drain(){
   if(!ack.ok)throw Error('归档确认失败');
   totalAdded+=result.added;
   }
+  const entries=JSON.parse(localStorage.getItem(ShiguangCapture.KEY)||'[]');
+  await chrome.runtime.sendMessage({type:'SHIGUANG_CATEGORIES',owner:localStorage.getItem('shiguang.cloud.owner'),tags:[...new Set(entries.flatMap(item=>item.tags||[]))]});
   if(!totalAdded)return;
   window.dispatchEvent(new StorageEvent('storage',{key:ShiguangCapture.KEY,newValue:localStorage.getItem(ShiguangCapture.KEY)}));
   const note=document.createElement('div');note.textContent=`拾光：快捷收藏已归入知识库（新增 ${totalAdded} 条）`;

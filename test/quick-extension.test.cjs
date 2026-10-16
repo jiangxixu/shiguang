@@ -57,3 +57,18 @@ test('page shortcut uses the content sender URL without requiring sensitive tab 
  assert.equal((await w.editor({type:'SHIGUANG_CAPTURE_SAVE',id,tags:'',reason:''})).ok,true);
  const items=(await w.message({type:'SHIGUANG_PENDING'})).items;assert.equal(items[0].notes,'');assert.equal(items[0].tags.length,0);
 });
+
+
+test('category suggestions include library tags and survive queue draining without leaking account tags',async()=>{
+ const w=worker();await w.message({type:'SHIGUANG_CATEGORIES',tags:['机器人','操作演示']});
+ await w.events.click({id:1});let id=Object.keys(w.db.captureDrafts).at(-1);
+ assert.deepEqual([...(await w.editor({type:'SHIGUANG_CAPTURE_GET',id})).tags],['机器人','操作演示']);
+ await w.editor({type:'SHIGUANG_CAPTURE_SAVE',id,tags:'新分类'});
+ const entries=(await w.message({type:'SHIGUANG_PENDING'})).items;
+ await w.message({type:'SHIGUANG_ACK',ids:entries.map(x=>x.id)});
+ await w.events.click({id:1});id=Object.keys(w.db.captureDrafts).at(-1);
+ assert.ok((await w.editor({type:'SHIGUANG_CAPTURE_GET',id})).tags.includes('新分类'));
+ w.db['shiguang.extension.owner']='another-user';await w.events.click({id:1});id=Object.keys(w.db.captureDrafts).at(-1);
+ assert.equal((await w.editor({type:'SHIGUANG_CAPTURE_GET',id})).tags.length,0);
+ assert.equal(await w.send({type:'SHIGUANG_CATEGORIES',tags:['非法']},{id:'test-extension',tab:{url:'https://example.com/'}}),undefined);
+});
