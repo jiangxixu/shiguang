@@ -6,3 +6,5 @@
 @media(max-width:700px){.android-link{font-size:9px;padding:6px}.header-actions{gap:4px}.breadcrumb span{margin:0 6px}}
 
 #cloud-account{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:700px){.header-actions{flex-wrap:wrap;gap:6px}#cloud-account{max-width:150px;font-size:11px}.android-link{font-size:11px}}
+
+.card-bottom{flex-wrap:wrap;gap:8px}.card-bottom>div{display:flex;align-items:center;gap:5px;flex-wrap:wrap}.card-bottom [data-edit]{border:1px solid #dce2d2;border-radius:4px;padding:4px 8px;color:var(--green)}.card-title:hover{color:var(--green);text-decoration:underline;text-underline-offset:4px}

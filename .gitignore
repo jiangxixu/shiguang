@@ -12,3 +12,6 @@ android/**/build/
 android/local.properties
 preview.jpg
 *.log
+/tools/
+/signing/
+/archives/
