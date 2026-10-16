@@ -32,10 +32,17 @@ public class MainActivity extends Activity {
         web = new WebView(this);
         layout.addView(web, new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout bar = new LinearLayout(this);
-        bar.setPadding(12,2,12,2);
-        addButton(bar,"↻ 刷新",()->web.reload());
-        addButton(bar,"↗ 网页版",()->external(Uri.parse(BuildConfig.WEB_URL)));
-        addButton(bar,"关于",()->new android.app.AlertDialog.Builder(this).setTitle("拾光 "+BuildConfig.VERSION_NAME).setMessage("独立 Android 应用，知识库可离线使用。\n\n在 App 和网站使用同一个邮箱登录，即可自动同步收藏。离线时先保存在本机，打开 App 或再次分享时补传。卸载或清除 App 数据前请确认同步完成或导出备份。\n\n其他 App 中可选择分享链接到「拾光」，自动保存并返回原 App。源码与更新：github.com/jiangxixu/shiguang").setPositiveButton("知道了",null).show());
+        bar.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(16),0,dp(8),0);
+        TextView label=new TextView(this);label.setText("拾光 · "+BuildConfig.VERSION_NAME);label.setTextSize(11);label.setTextColor(Color.rgb(138,145,137));
+        bar.addView(label,new LinearLayout.LayoutParams(0,dp(44),1));label.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        TextView more=new TextView(this);more.setText("更多 ⋯");more.setTextSize(13);more.setTextColor(Color.rgb(71,101,78));more.setGravity(android.view.Gravity.CENTER);more.setContentDescription("更多操作");
+        more.setBackgroundResource(android.R.drawable.list_selector_background);more.setOnClickListener(v->{
+            PopupMenu menu=new PopupMenu(this,more);
+            menu.getMenu().add(0,1,0,"刷新收藏");menu.getMenu().add(0,2,1,"打开网页版");menu.getMenu().add(0,3,2,"关于拾光");
+            menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){case 1:web.reload();return true;case 2:external(Uri.parse(BuildConfig.WEB_URL));return true;case 3:showAbout();return true;default:return false;}});menu.show();
+        });
+        bar.addView(more,new LinearLayout.LayoutParams(dp(80),dp(44)));
         layout.addView(bar); setContentView(layout);
         WebSettings settings=web.getSettings();
         settings.setJavaScriptEnabled(true); settings.setDomStorageEnabled(true);
@@ -74,7 +81,8 @@ public class MainActivity extends Activity {
         loadIntent(getIntent());
     }
     private boolean isLocal(Uri u){return "https".equals(u.getScheme())&&"appassets.androidplatform.net".equals(u.getHost());}
-    private void addButton(LinearLayout bar,String title,Runnable action){Button b=new Button(this);b.setText(title);b.setTextSize(11);b.setAllCaps(false);b.setOnClickListener(v->action.run());bar.addView(b,new LinearLayout.LayoutParams(0,-2,1));}
+    private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
+    private void showAbout(){new android.app.AlertDialog.Builder(this).setTitle("拾光 "+BuildConfig.VERSION_NAME).setMessage("在 App 和网站使用同一个邮箱登录，即可同步收藏。离线时先保存在本机，打开 App 或再次分享时补传。\n\n在其他 App 中选择分享链接到「拾光」，即可保存。\n\n更新：github.com/jiangxixu/shiguang\n卸载或清除数据前，请确认同步完成或导出备份。").setPositiveButton("知道了",null).show();}
     private void external(Uri u){if(!"https".equals(u.getScheme())&&!"http".equals(u.getScheme()))return;try{startActivity(new Intent(Intent.ACTION_VIEW,u));}catch(Exception ignored){Toast.makeText(this,"没有可打开链接的浏览器",Toast.LENGTH_SHORT).show();}}
     private void loadIntent(Intent intent){
         if(Intent.ACTION_SEND.equals(intent.getAction())){

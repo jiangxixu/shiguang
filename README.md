@@ -88,3 +88,5 @@ Android 发布前需配置仓库 Actions Secrets：ANDROID_KEYSTORE_BASE64、AND
 tools/、signing/、archives/ 已加入 .gitignore，不会随代码上传 GitHub。
 
 收藏分类支持下拉选择、输入筛选及新建，可多选。更新扩展后先刷新拾光网站，让已有分类同步到扩展，再使用空格＋S 收藏。分类和原因均为选填。
+
+手机版 1.4.0：紧凑导航与首屏布局，默认单列收藏列表，筛选可展开，增大表单文字和触控区域。Android 底栏提供“更多”菜单（刷新、网页版、关于）。已安装用户直接安装新版 APK 更新，无需卸载。
