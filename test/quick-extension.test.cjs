@@ -50,3 +50,10 @@ test('space plus S ignores editable fields, repeats and resets on blur',async()=
  handlers.blur();handlers.keydown(key('KeyS'));assert.equal(sent.length,1);
  handlers.keydown(key('Space'));handlers.keyup(key('Space'));handlers.keydown(key('KeyS'));assert.equal(sent.length,1);
 });
+
+test('page shortcut uses the content sender URL without requiring sensitive tab metadata or activeTab',async()=>{
+ const w=worker();const result=await w.send({type:'SHIGUANG_SHORTCUT',title:'公开教程',selection:''},{id:'test-extension',url:'https://example.com/tutorial',tab:{id:3}});
+ assert.equal(result.ok,true);const id=Object.keys(w.db.captureDrafts)[0];assert.equal(w.db.captureDrafts[id].raw.url,'https://example.com/tutorial');
+ assert.equal((await w.editor({type:'SHIGUANG_CAPTURE_SAVE',id,tags:'',reason:''})).ok,true);
+ const items=(await w.message({type:'SHIGUANG_PENDING'})).items;assert.equal(items[0].notes,'');assert.equal(items[0].tags.length,0);
+});

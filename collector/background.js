@@ -62,8 +62,9 @@ async function saveDraft(message){
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  if(sender.id!==chrome.runtime.id)return;
- if(message.type==='SHIGUANG_SHORTCUT'&&sender.tab?.id&&SG.safeUrl(sender.tab.url)){
-  openCapture(sender.tab,{raw:{url:sender.tab.url,title:String(message.title||sender.tab.url).slice(0,500),selection:String(message.selection||'').slice(0,5000),createdAt:new Date().toISOString()}}).then(()=>respond({ok:true})).catch(e=>respond({error:e.message}));return true;
+ const sourceURL=sender.url||sender.tab?.url;
+ if(message.type==='SHIGUANG_SHORTCUT'&&sender.tab?.id&&SG.safeUrl(sourceURL)){
+  openCapture(sender.tab,{raw:{url:sourceURL,title:String(message.title||sourceURL).slice(0,500),selection:String(message.selection||'').slice(0,5000),createdAt:new Date().toISOString()}}).then(()=>respond({ok:true})).catch(e=>respond({error:e.message}));return true;
  }
  const fromCapture=sender.url?.startsWith(chrome.runtime.getURL('capture.html')+'?');
  if(fromCapture&&message.type==='SHIGUANG_CAPTURE_GET'){
