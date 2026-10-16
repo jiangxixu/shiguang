@@ -17,5 +17,5 @@ Deno.serve(async req=>{
   const raw=await req.text();if(raw.length>5000)return json({error:'too_large'},413);const {url}=JSON.parse(raw);if(typeof url!=='string'||url.length>2000||!allowed(url))return json({error:'unsupported_url'},400);
   const cached=cache.get(url);if(cached&&cached.until>now)return json(cached.data);
   const data=await preview(url);cache.set(url,{data,until:now+86400000});if(cache.size>500)cache.delete(cache.keys().next().value);return json(data);
- }catch{return json({error:'preview_unavailable'},502);}
+ }catch(error){console.warn('preview_failed',error.message);return json({error:'preview_unavailable'},502);}
 });

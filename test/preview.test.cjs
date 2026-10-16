@@ -1,5 +1,11 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const SG=require('../dist/core.js'),Capture=require('../dist/capture-store.js');
+
+test('Android fetches public Bilibili metadata on the phone without requiring a cloud session',async()=>{
+ const page={window:null,SG,URL,setTimeout,clearTimeout,ShiguangPreviewNative:{postMessage(raw){const data=JSON.parse(raw);queueMicrotask(()=>this.onmessage({data:JSON.stringify({id:data.id,thumbnail:'https://i0.hdslb.com/test.jpg',title:'视频'})}));}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);
+ const result=await page.ShiguangPreview.fetch({url:'https://www.bilibili.com/video/BV123'});assert.equal(result.thumbnail,'https://i0.hdslb.com/test.jpg');assert.equal(result.title,'视频');
+});
 test('thumbnail survives normalize, backup and cloud merge; unsafe images rejected',()=>{
  const input={url:'https://www.bilibili.com/video/BV123',thumbnail:'https://i0.hdslb.com/bfs/archive/test.jpg'};
  assert.equal(SG.normalize(input).thumbnail,input.thumbnail);

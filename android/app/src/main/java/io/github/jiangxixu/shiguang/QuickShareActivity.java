@@ -70,6 +70,7 @@ public class QuickShareActivity extends Activity {
                 v.evaluateJavascript("window.shiguangReceiveShare("+payload+")",null);
             }
         });
+        PreviewBridge.install(this,web);
         web.loadUrl(HOME);
     }
     private void complete(String message,boolean success){

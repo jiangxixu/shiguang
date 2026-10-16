@@ -3,7 +3,7 @@ const SG=require('../dist/core.js'),Capture=require('../dist/capture-store.js');
 const path=require('node:path');
 function worker(){
  const events={},db={},listeners=[],windows=[],api={commands:{onCommand:{addListener:fn=>events.command=fn}},contextMenus:{onClicked:{addListener:fn=>events.menu=fn}},windows:{create:async options=>windows.push(options)},alarms:{create(){},onAlarm:{addListener(){}}},runtime:{id:'test-extension',getURL:name=>'chrome-extension://test-extension/'+name,onMessage:{addListener:fn=>listeners.push(fn)},onInstalled:{addListener(){}},onStartup:{addListener(){}}},action:{onClicked:{addListener:fn=>events.click=fn},setBadgeBackgroundColor:async()=>{},setBadgeText:async()=>{},setTitle:async()=>{}},tabs:{query:async query=>query.active?[{id:1}]:[]},storage:{local:{get:async key=>structuredClone({[key]:db[key]}),set:async values=>Object.assign(db,structuredClone(values))}},scripting:{executeScript:async options=>options.args?[]:[{result:{url:'https://www.bilibili.com/video/BV123?vd_source=a',title:'学习视频',selection:'选中的内容'}}]}};
- const ctx={chrome:api,importScripts(){},SG,console,crypto:require('node:crypto').webcrypto,pushCloud:async()=>({signedIn:false})};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../collector/background.js'),'utf8'),ctx);
+ const ctx={URL,chrome:api,importScripts(){},SG,console,crypto:require('node:crypto').webcrypto,pushCloud:async()=>({signedIn:false})};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../collector/background.js'),'utf8'),ctx);
  const sender={id:'test-extension',tab:{url:'https://jiangxixu.github.io/shiguang/'}};
  const send=(data,from)=>new Promise(resolve=>{let handled=false;for(const listener of listeners)if(listener(data,from,resolve)===true)handled=true;if(!handled)resolve(undefined);});
  const message=data=>send(data,sender);
@@ -41,7 +41,7 @@ test('shortcut and context menu open capture; account switching prevents saving 
 
 test('space plus S ignores editable fields, repeats and resets on blur',async()=>{
  const handlers={},sent=[];class Element{matches(){return this.edit;}get isContentEditable(){return false;}}
- const ctx={Element,document:{addEventListener:(name,fn)=>handlers[name]=fn,title:'网页标题'},window:{addEventListener:(name,fn)=>handlers[name]=fn},getSelection:()=>({toString:()=>''}),chrome:{runtime:{sendMessage:async message=>{sent.push(message);}}}};
+ const ctx={Element,location:{href:'https://example.com/current-topic'},document:{addEventListener:(name,fn)=>handlers[name]=fn,title:'网页标题'},window:{addEventListener:(name,fn)=>handlers[name]=fn},getSelection:()=>({toString:()=>''}),chrome:{runtime:{sendMessage:async message=>{sent.push(message);}}}};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../collector/shortcut.js'),'utf8'),ctx);
  const key=(code,extra={})=>({code,composedPath:()=>[],preventDefault(){},stopPropagation(){},...extra});
  const input=new Element();input.edit=true;
@@ -56,6 +56,14 @@ test('page shortcut uses the content sender URL without requiring sensitive tab 
  assert.equal(result.ok,true);const id=Object.keys(w.db.captureDrafts)[0];assert.equal(w.db.captureDrafts[id].raw.url,'https://example.com/tutorial');
  assert.equal((await w.editor({type:'SHIGUANG_CAPTURE_SAVE',id,tags:'',reason:''})).ok,true);
  const items=(await w.message({type:'SHIGUANG_PENDING'})).items;assert.equal(items[0].notes,'');assert.equal(items[0].tags.length,0);
+});
+
+test('SPA shortcuts capture the current same-origin topic URL and reject a different origin',async()=>{
+ const w=worker(),sender={id:'test-extension',url:'https://linux.do/',tab:{id:3}};
+ await w.send({type:'SHIGUANG_SHORTCUT',url:'https://linux.do/t/topic/123',title:'话题'},sender);
+ assert.equal(Object.values(w.db.captureDrafts)[0].raw.url,'https://linux.do/t/topic/123');
+ await w.send({type:'SHIGUANG_SHORTCUT',url:'https://evil.example/',title:'测试'},sender);
+ assert.equal(Object.values(w.db.captureDrafts).at(-1).raw.url,'https://linux.do/');
 });
 
 
@@ -86,7 +94,7 @@ test('extension reload stops old bridge timers, shows one refresh notice and nev
 
 test('stale shortcut handles synchronous invalidation and stops messaging',()=>{
  const handlers={};let sends=0;
- const page={Element:class{},document:{addEventListener:(key,fn)=>handlers[key]=fn,title:'教程'},window:{addEventListener(){}},getSelection:()=>({toString:()=>''}),chrome:{runtime:{sendMessage(){sends++;throw Error('Extension context invalidated.');}}}};
+ const page={location:{href:"https://example.com/tutorial"},Element:class{},document:{addEventListener:(key,fn)=>handlers[key]=fn,title:'教程'},window:{addEventListener(){}},getSelection:()=>({toString:()=>''}),chrome:{runtime:{sendMessage(){sends++;throw Error('Extension context invalidated.');}}}};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../collector/shortcut.js'),'utf8'),page);
  const event=code=>({code,composedPath:()=>[],preventDefault(){},stopPropagation(){}});
  for(let i=0;i<2;i++){handlers.keydown(event('Space'));assert.doesNotThrow(()=>handlers.keydown(event('KeyS')));handlers.keyup(event('Space'));}

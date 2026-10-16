@@ -14,7 +14,7 @@ export async function preview(value,fetcher=fetch){
  const request=async target=>{if(!allowed(target))throw Error('unsupported_redirect');return fetcher(target,{redirect:'manual',signal:AbortSignal.timeout(7000),headers:{'User-Agent':'Mozilla/5.0','Accept':'text/html,application/json','Referer':'https://www.bilibili.com/'}});};
  for(let i=0;i<5;i++){
   const u=new URL(url),bv=u.hostname.endsWith('bilibili.com')&&u.pathname.match(/\/(BV[\da-zA-Z]+)(?:\/|$)/)?.[1];
-  if(bv){try{const response=await request('https://api.bilibili.com/x/web-interface/view?bvid='+encodeURIComponent(bv));const data=JSON.parse(await limitedText(response));if(data.code===0&&data.data?.pic)return {url,thumbnail:imageUrl(data.data.pic,url),title:String(data.data.title||'').slice(0,500)};}catch{}}
+  if(bv){try{const response=await request('https://api.bilibili.com/x/web-interface/view?bvid='+encodeURIComponent(bv));const data=JSON.parse(await limitedText(response));if(data.code===0&&data.data?.pic)return {url,thumbnail:imageUrl(data.data.pic,url),title:String(data.data.title||'').slice(0,500)};console.warn('preview_bilibili',response.status,data.code);}catch(error){console.warn('preview_bilibili',error.message);}}
   const response=await request(url);
   if([301,302,303,307,308].includes(response.status)){const next=response.headers.get('location');if(!next)break;url=new URL(next,url).href;if(!allowed(url))throw Error('unsupported_redirect');continue;}
   if(!response.ok)throw Error('upstream_unavailable');return parseMeta(await limitedText(response),url);
