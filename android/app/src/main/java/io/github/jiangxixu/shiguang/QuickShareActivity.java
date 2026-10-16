@@ -17,7 +17,7 @@ import org.json.JSONArray;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Receives a share, saves into the app's existing origin storage, then returns. */
+/** Shows optional categories and reason before saving a shared link. */
 public class QuickShareActivity extends Activity {
     private static final String HOME="https://appassets.androidplatform.net/assets/quick-share.html";
     private WebView web;
@@ -39,9 +39,13 @@ public class QuickShareActivity extends Activity {
         if(title.isEmpty())title=text.replace(match.group(),"").replaceAll("^[\\s\\-—:：]+|[\\s\\-—:：]+$","");
         if(title.isEmpty())title=Uri.parse(link).getHost();
         JSONObject item=new JSONObject();
-        try{item.put("url",link);item.put("title",title==null?"收藏链接":title.substring(0,Math.min(500,title.length())));item.put("notes",text.substring(0,Math.min(5000,text.length())));}catch(Exception e){complete("无法读取分享内容",false);return;}
-        String payload=new JSONArray().put(item).toString();
-        web=new WebView(this);web.setBackgroundColor(android.graphics.Color.TRANSPARENT);web.setVisibility(android.view.View.INVISIBLE);setContentView(web);
+        try{item.put("url",link);item.put("title",title==null?"收藏链接":title.substring(0,Math.min(500,title.length())));}catch(Exception e){complete("无法读取分享内容",false);return;}
+        String payload=item.toString();
+        web=new WebView(this);web.setBackgroundColor(android.graphics.Color.rgb(246,245,240));setContentView(web);
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);getWindow().setDimAmount(0.3f);
+        getWindow().setGravity(android.view.Gravity.BOTTOM);
+        getWindow().setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT,Math.min(Math.round(650*getResources().getDisplayMetrics().density),(int)(getResources().getDisplayMetrics().heightPixels*0.9)));
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
@@ -51,8 +55,9 @@ public class QuickShareActivity extends Activity {
             if(!mainFrame||!"https://appassets.androidplatform.net".equals(origin.toString())||done)return;
             try{
                 JSONObject report=new JSONObject(message.getData());
-                if(report.optBoolean("saved"))locallySaved=true;
-                if(report.optBoolean("done"))complete(report.optBoolean("cloud")?"已收进拾光并同步到云端":"已保存在手机，打开拾光登录或重试同步",locallySaved);
+                if(report.optBoolean("cancel")){setResult(RESULT_CANCELED);finish();return;}
+                if(report.optBoolean("saved")){locallySaved=true;handler.postDelayed(timeout,10000);}
+                if(report.optBoolean("done"))complete(report.optBoolean("duplicate")?"拾光中已收藏过这条内容":report.optBoolean("cloud")?"已收进拾光并同步到云端":"已保存在手机，联网登录后自动同步",locallySaved);
                 if(report.optBoolean("error"))complete("未保存：存储异常，请打开拾光检查或备份",false);
             }catch(Exception ignored){}
         });
@@ -61,19 +66,11 @@ public class QuickShareActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest request){return true;}
             @Override public void onPageFinished(WebView v,String url){
                 if(!HOME.equals(url)||done||started)return;started=true;
-                if(canReport){
-                    String script="(async()=>{try{ShiguangCapture.save(localStorage,"+payload+");ShiguangQuickResult.postMessage(JSON.stringify({saved:true}));let cloud=false;try{const r=await ShiguangCloud.sync();cloud=r.signedIn&&r.pending===0}catch(e){}ShiguangQuickResult.postMessage(JSON.stringify({done:true,cloud}))}catch(e){ShiguangQuickResult.postMessage(JSON.stringify({error:true}))}})()";
-                    v.evaluateJavascript(script,null);return;
-                }
-                String script="(()=>{try{const r=ShiguangCapture.save(localStorage,"+payload+");return r.added?'saved':'duplicate'}catch(e){return 'error'}})()";
-                v.evaluateJavascript(script,result->{
-                    if("\"saved\"".equals(result))complete("已收进拾光",true);
-                    else if("\"duplicate\"".equals(result))complete("拾光中已收藏过这条内容",true);
-                    else complete("未保存：存储异常，请打开拾光检查或备份",false);
-                });
+                if(!canReport){complete("请更新 Android System WebView 后使用分类收藏",false);return;}
+                v.evaluateJavascript("window.shiguangReceiveShare("+payload+")",null);
             }
         });
-        handler.postDelayed(timeout,15000);web.loadUrl(HOME);
+        web.loadUrl(HOME);
     }
     private void complete(String message,boolean success){
         if(done)return;done=true;handler.removeCallbacks(timeout);

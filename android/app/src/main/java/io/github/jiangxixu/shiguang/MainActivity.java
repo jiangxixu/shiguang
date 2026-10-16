@@ -68,7 +68,13 @@ public class MainActivity extends Activity {
                 if(!isMainFrame||!ORIGIN.equals(sourceOrigin.toString()))return;
                 try{
                     String raw=message.getData();if(raw==null||raw.length()>16*1024*1024)throw new Exception();
-                    JSONObject data=new JSONObject(raw);String name=data.getString("name");
+                    JSONObject data=new JSONObject(raw);
+                    if("paste".equals(data.optString("action"))){
+                        android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                        String text="";if(clipboard.hasPrimaryClip()&&clipboard.getPrimaryClip().getItemCount()>0){CharSequence value=clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);if(value!=null)text=value.toString();}
+                        JSONObject response=new JSONObject();response.put("clipboard",text.substring(0,Math.min(10000,text.length())));reply.postMessage(response.toString());return;
+                    }
+                    String name=data.getString("name");
                     if(!name.matches("[^/\\\\]{1,120}\\.(json|csv)"))throw new Exception();
                     if(pendingExport!=null){Toast.makeText(this,"请先完成上一次文件保存",Toast.LENGTH_SHORT).show();return;}
                     pendingExport=data.getString("content").getBytes(StandardCharsets.UTF_8);

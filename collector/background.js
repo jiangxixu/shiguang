@@ -22,8 +22,8 @@ async function tell(tabId,text){
 async function openCapture(tab,info={}){
  try{
   if(!tab.id)throw Error('没有活动网页');
-  const result=info.raw||((await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>({url:location.href,title:document.title,selection:getSelection().toString().slice(0,5000),createdAt:new Date().toISOString()})}))[0].result);
-  if(info.linkUrl){result.url=info.linkUrl;result.title=info.selectionText||info.linkUrl;}
+  const result=info.raw||((await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>({url:location.href,title:document.title,thumbnail:document.querySelector('meta[property="og:image"],meta[name="twitter:image"]')?.content||'',selection:getSelection().toString().slice(0,5000),createdAt:new Date().toISOString()})}))[0].result);
+  if(info.linkUrl){result.url=info.linkUrl;result.title=info.selectionText||info.linkUrl;result.thumbnail='';}
   if(!SG.safeUrl(result.url))throw Error('请在普通网页上收藏');
   const ownership=await chrome.storage.local.get('shiguang.extension.owner');
   const id=crypto.randomUUID();
@@ -71,7 +71,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  if(sender.id!==chrome.runtime.id)return;
  const sourceURL=sender.url||sender.tab?.url;
  if(message.type==='SHIGUANG_SHORTCUT'&&sender.tab?.id&&SG.safeUrl(sourceURL)){
-  openCapture(sender.tab,{raw:{url:sourceURL,title:String(message.title||sourceURL).slice(0,500),selection:String(message.selection||'').slice(0,5000),createdAt:new Date().toISOString()}}).then(()=>respond({ok:true})).catch(e=>respond({error:e.message}));return true;
+  openCapture(sender.tab,{raw:{url:sourceURL,title:String(message.title||sourceURL).slice(0,500),thumbnail:SG.safeImage(message.thumbnail),selection:String(message.selection||'').slice(0,5000),createdAt:new Date().toISOString()}}).then(()=>respond({ok:true})).catch(e=>respond({error:e.message}));return true;
  }
  const fromCapture=sender.url?.startsWith(chrome.runtime.getURL('capture.html')+'?');
  if(fromCapture&&message.type==='SHIGUANG_CAPTURE_GET'){

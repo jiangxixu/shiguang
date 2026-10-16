@@ -1,0 +1,30 @@
+(function(){
+ 'use strict';
+ let draft=null,resolveDraft,saving=false,owner=null;
+ const ready=new Promise(resolve=>resolveDraft=resolve);
+ const report=data=>window.ShiguangQuickResult?.postMessage(JSON.stringify(data));
+ window.shiguangReceiveShare=item=>{
+  if(draft)return;draft=SG.normalize(item);resolveDraft();
+  if(draft)ShiguangPreview.fetch(draft).then(meta=>{if(!saving&&meta.thumbnail)draft.thumbnail=meta.thumbnail;if(!saving&&meta.title){draft.title=meta.title;document.getElementById('title').textContent=meta.title;}}).catch(()=>{});
+ };
+ window.ShiguangCloseCapture=()=>report({cancel:true});
+ window.ShiguangCaptureTransport={async sendMessage(message){
+  await ready;if(!draft)throw Error('分享链接无效，请重新分享');
+  if(message.type==='SHIGUANG_CAPTURE_GET'){
+   // Use the same library origin and account as the main Android activity.
+   await ShiguangCloud.ready;owner=localStorage.getItem("shiguang.cloud.owner");
+   const entries=JSON.parse(localStorage.getItem(ShiguangCapture.KEY)||'[]');
+   return {...draft,tags:[...new Set(entries.flatMap(item=>item.tags||[]))]};
+  }
+  if(message.type==='SHIGUANG_CAPTURE_SAVE'){
+   if(saving)throw Error('正在保存，请稍候');if(localStorage.getItem('shiguang.cloud.owner')!==owner)throw Error('账号已切换，请重新分享');saving=true;
+   try{
+    const result=ShiguangCapture.save(localStorage,[{...draft,tags:message.tags,notes:message.reason||''}]);
+    report({saved:true});
+    let cloud=false;try{const result=await Promise.race([ShiguangCloud.sync(),new Promise(resolve=>setTimeout(()=>resolve({}),5000))]);cloud=!!result.signedIn&&result.pending===0;}catch{}
+    report({done:true,cloud,duplicate:result.duplicates>0});return {ok:true,duplicate:result.duplicates>0};
+   }catch(error){saving=false;throw error;}
+  }
+  throw Error('无法识别的收藏操作');
+ }};
+})();

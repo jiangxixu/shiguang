@@ -1,4 +1,5 @@
 'use strict';
+const transport=window.ShiguangCaptureTransport||chrome.runtime,closeCapture=()=>window.ShiguangCloseCapture?window.ShiguangCloseCapture():window.close();
 const id=new URLSearchParams(location.search).get('draft'),status=document.getElementById('status'),save=document.getElementById('save');
 const input=document.getElementById('tags'),options=document.getElementById('categories'),selectedBox=document.getElementById('selected-tags');
 let known=[],selected=[],active=-1;
@@ -37,10 +38,10 @@ input.addEventListener('keydown',event=>{
  if(event.key==='Enter'&&!event.ctrlKey&&!event.metaKey){event.preventDefault();const buttons=[...options.querySelectorAll('button')];if(!options.hidden&&active>=0)buttons[active]?.click();else if(input.value.trim())addCategory(input.value);else hideCategories();}
 });
 document.addEventListener('click',event=>{if(!event.target.closest('.category-picker')&&!event.target.closest('.category-chip'))hideCategories();});
-document.getElementById('cancel').onclick=()=>window.close();
+document.getElementById('cancel').onclick=()=>closeCapture();
 async function load(){
  try{
-  const draft=await chrome.runtime.sendMessage({type:'SHIGUANG_CAPTURE_GET',id});
+  const draft=await transport.sendMessage({type:'SHIGUANG_CAPTURE_GET',id});
   if(draft?.error)throw Error(draft.error);if(!draft?.url)throw Error('未找到待收藏网页');
   document.getElementById('title').textContent=draft.title;document.getElementById('url').textContent=draft.url;
   known=[...new Set(draft.tags||[])];
@@ -51,11 +52,11 @@ async function load(){
 document.getElementById('capture-form').onsubmit=async event=>{
  event.preventDefault();if(save.disabled)return;if(input.value.trim())addCategory(input.value);hideCategories();save.disabled=true;status.textContent='正在保存…';
  try{
-  const result=await chrome.runtime.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',id,tags:selected.join('，'),reason:document.getElementById('reason').value});
+  const result=await transport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',id,tags:selected.join('，'),reason:document.getElementById('reason').value});
   if(!result?.ok)throw Error(result?.error||'未保存，请重试');
   status.textContent=result.duplicate?'这条内容已收藏，保留原有笔记。':'已收下，联网后自动同步。';
-  setTimeout(()=>window.close(),900);
+  setTimeout(()=>closeCapture(),900);
  }catch(error){status.textContent=error.message;save.disabled=false;}
 };
-document.addEventListener('keydown',event=>{if(event.key==='Escape')window.close();if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();document.getElementById('capture-form').requestSubmit();}});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')closeCapture();if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();document.getElementById('capture-form').requestSubmit();}});
 load();
