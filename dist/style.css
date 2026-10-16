@@ -4,3 +4,5 @@
 .mobile-filter{display:none}@media(max-width:700px){.mobile-filter{display:block}.toolbar select{flex:1;min-width:calc(50% - 10px);max-width:none}}
 
 @media(max-width:700px){.android-link{font-size:9px;padding:6px}.header-actions{gap:4px}.breadcrumb span{margin:0 6px}}
+
+#cloud-account{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:700px){.header-actions{flex-wrap:wrap;gap:6px}#cloud-account{max-width:150px;font-size:11px}.android-link{font-size:11px}}

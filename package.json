@@ -1,1 +1,14 @@
-{"name":"shiguang","version":"1.0.0","private":true,"scripts":{"start":"node server.cjs","test":"node --test test/*.test.cjs"}}
+{
+  "name": "shiguang",
+  "version": "1.2.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test test/*.test.cjs",
+    "build:cloud": "node scripts/bundle-cloud.cjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
+    "esbuild": "0.25.12"
+  }
+}

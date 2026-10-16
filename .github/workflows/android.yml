@@ -2,7 +2,7 @@ name: Build and publish Android
 on:
   push:
     branches: [main]
-    paths: ['android/**', 'dist/**', 'test/**', 'scripts/**', '.github/workflows/android.yml']
+    paths: ['android/**', 'collector/**', 'dist/**', 'test/**', 'scripts/**', '.github/workflows/android.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,6 +18,8 @@ jobs:
         run: |
           node --test test/*.test.cjs
           node --check dist/app.js
+          node --check collector/background.js
+          node --check collector/library-bridge.js
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
@@ -41,7 +43,8 @@ jobs:
           mkdir -p release
           cp android/app/build/outputs/apk/release/app-release.apk release/shiguang-android.apk
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose release/shiguang-android.apk
-          cd release && sha256sum shiguang-android.apk > SHA256SUMS.txt
+          cp dist/collector.zip release/shiguang-collector.zip
+          cd release && sha256sum shiguang-android.apk shiguang-collector.zip > SHA256SUMS.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: android-release

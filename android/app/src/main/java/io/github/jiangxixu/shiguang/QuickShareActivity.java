@@ -1,0 +1,84 @@
+package io.github.jiangxixu.shiguang;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.webkit.*;
+import android.widget.Toast;
+import androidx.webkit.WebViewAssetLoader;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
+import java.util.Collections;
+import org.json.JSONObject;
+import org.json.JSONArray;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Receives a share, saves into the app's existing origin storage, then returns. */
+public class QuickShareActivity extends Activity {
+    private static final String HOME="https://appassets.androidplatform.net/assets/quick-share.html";
+    private WebView web;
+    private final Handler handler=new Handler(Looper.getMainLooper());
+    private boolean done=false,started=false,locallySaved=false;
+    private final Runnable timeout=()->complete(locallySaved?"已保存在手机，打开拾光后会重试云端同步":"保存超时，请重新分享",locallySaved);
+
+    @Override public void onCreate(Bundle state){
+        super.onCreate(state);
+        Intent intent=getIntent();
+        if(!Intent.ACTION_SEND.equals(intent.getAction())){finish();return;}
+        String text=intent.getStringExtra(Intent.EXTRA_TEXT);
+        if(text==null||text.length()>100000){complete("分享内容中未找到链接",false);return;}
+        Matcher match=Pattern.compile("https?://[^\\s<>\\\"，。；）】]+").matcher(text);
+        if(!match.find()){complete("分享内容中未找到链接，请选择复制链接或分享链接",false);return;}
+        String link=match.group().replaceAll("[)\\].,;!]+$","");
+        String subject=intent.getStringExtra(Intent.EXTRA_SUBJECT);
+        String title=subject==null?"":subject.trim();
+        if(title.isEmpty())title=text.replace(match.group(),"").replaceAll("^[\\s\\-—:：]+|[\\s\\-—:：]+$","");
+        if(title.isEmpty())title=Uri.parse(link).getHost();
+        JSONObject item=new JSONObject();
+        try{item.put("url",link);item.put("title",title==null?"收藏链接":title.substring(0,Math.min(500,title.length())));item.put("notes",text.substring(0,Math.min(5000,text.length())));}catch(Exception e){complete("无法读取分享内容",false);return;}
+        String payload=new JSONArray().put(item).toString();
+        web=new WebView(this);web.setBackgroundColor(android.graphics.Color.TRANSPARENT);web.setVisibility(android.view.View.INVISIBLE);setContentView(web);
+        WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        WebViewAssetLoader loader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
+        final boolean canReport=WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);
+        if(canReport)WebViewCompat.addWebMessageListener(web,"ShiguangQuickResult",Collections.singleton("https://appassets.androidplatform.net"),(v,message,origin,mainFrame,reply)->{
+            if(!mainFrame||!"https://appassets.androidplatform.net".equals(origin.toString())||done)return;
+            try{
+                JSONObject report=new JSONObject(message.getData());
+                if(report.optBoolean("saved"))locallySaved=true;
+                if(report.optBoolean("done"))complete(report.optBoolean("cloud")?"已收进拾光并同步到云端":"已保存在手机，打开拾光登录或重试同步",locallySaved);
+                if(report.optBoolean("error"))complete("未保存：存储异常，请打开拾光检查或备份",false);
+            }catch(Exception ignored){}
+        });
+        web.setWebViewClient(new WebViewClient(){
+            @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest request){WebResourceResponse response=loader.shouldInterceptRequest(request.getUrl());if(response!=null)return response;if("https".equals(request.getUrl().getScheme())&&"pkgsgkrjhcckmcjqdzws.supabase.co".equals(request.getUrl().getHost()))return null;return new WebResourceResponse("text/plain","UTF-8",new java.io.ByteArrayInputStream(new byte[0]));}
+            @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest request){return true;}
+            @Override public void onPageFinished(WebView v,String url){
+                if(!HOME.equals(url)||done||started)return;started=true;
+                if(canReport){
+                    String script="(async()=>{try{ShiguangCapture.save(localStorage,"+payload+");ShiguangQuickResult.postMessage(JSON.stringify({saved:true}));let cloud=false;try{const r=await ShiguangCloud.sync();cloud=r.signedIn&&r.pending===0}catch(e){}ShiguangQuickResult.postMessage(JSON.stringify({done:true,cloud}))}catch(e){ShiguangQuickResult.postMessage(JSON.stringify({error:true}))}})()";
+                    v.evaluateJavascript(script,null);return;
+                }
+                String script="(()=>{try{const r=ShiguangCapture.save(localStorage,"+payload+");return r.added?'saved':'duplicate'}catch(e){return 'error'}})()";
+                v.evaluateJavascript(script,result->{
+                    if("\"saved\"".equals(result))complete("已收进拾光",true);
+                    else if("\"duplicate\"".equals(result))complete("拾光中已收藏过这条内容",true);
+                    else complete("未保存：存储异常，请打开拾光检查或备份",false);
+                });
+            }
+        });
+        handler.postDelayed(timeout,15000);web.loadUrl(HOME);
+    }
+    private void complete(String message,boolean success){
+        if(done)return;done=true;handler.removeCallbacks(timeout);
+        Toast.makeText(this,message,success?Toast.LENGTH_SHORT:Toast.LENGTH_LONG).show();
+        setResult(success?RESULT_OK:RESULT_CANCELED);finish();
+    }
+    @Override protected void onDestroy(){handler.removeCallbacks(timeout);if(web!=null){web.stopLoading();web.destroy();}super.onDestroy();}
+}

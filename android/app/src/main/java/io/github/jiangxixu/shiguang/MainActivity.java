@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
         bar.setPadding(12,2,12,2);
         addButton(bar,"↻ 刷新",()->web.reload());
         addButton(bar,"↗ 网页版",()->external(Uri.parse(BuildConfig.WEB_URL)));
-        addButton(bar,"关于",()->new android.app.AlertDialog.Builder(this).setTitle("拾光 "+BuildConfig.VERSION_NAME).setMessage("独立 Android 应用，知识库可离线使用。\n\n网页与 App 的收藏各自保存在设备上，使用导出/导入备份迁移，当前没有账号登录与云端同步。卸载或清除 App 数据前务必备份。\n\n其他 App 中可选择分享链接到「拾光」，检查后保存。源码与更新：github.com/jiangxixu/shiguang").setPositiveButton("知道了",null).show());
+        addButton(bar,"关于",()->new android.app.AlertDialog.Builder(this).setTitle("拾光 "+BuildConfig.VERSION_NAME).setMessage("独立 Android 应用，知识库可离线使用。\n\n在 App 和网站使用同一个邮箱登录，即可自动同步收藏。离线时先保存在本机，打开 App 或再次分享时补传。卸载或清除 App 数据前请确认同步完成或导出备份。\n\n其他 App 中可选择分享链接到「拾光」，自动保存并返回原 App。源码与更新：github.com/jiangxixu/shiguang").setPositiveButton("知道了",null).show());
         layout.addView(bar); setContentView(layout);
         WebSettings settings=web.getSettings();
         settings.setJavaScriptEnabled(true); settings.setDomStorageEnabled(true);
@@ -90,6 +90,7 @@ public class MainActivity extends Activity {
         if(request==10&&fileCallback!=null){fileCallback.onReceiveValue(result==RESULT_OK&&data!=null&&data.getData()!=null?new Uri[]{data.getData()}:null);fileCallback=null;}
         if(request==11){byte[] bytes=pendingExport;pendingExport=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null&&bytes!=null){try(OutputStream out=getContentResolver().openOutputStream(data.getData())){if(out==null)throw new Exception();out.write(bytes);Toast.makeText(this,"备份已保存",Toast.LENGTH_SHORT).show();}catch(Exception e){Toast.makeText(this,"保存失败，请重试导出备份",Toast.LENGTH_LONG).show();}}}
     }
+    @Override protected void onResume(){super.onResume();if(web!=null)web.evaluateJavascript("window.dispatchEvent(new Event('shiguang-refresh'));window.ShiguangCloud?.schedule()",null);}
     @Override public void onBackPressed(){if(web.canGoBack())web.goBack();else super.onBackPressed();}
     @Override protected void onDestroy(){if(fileCallback!=null)fileCallback.onReceiveValue(null);web.destroy();super.onDestroy();}
 }

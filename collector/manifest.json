@@ -1,1 +1,36 @@
-{"manifest_version":3,"name":"拾光 · 收藏采集","description":"由你主动采集当前页面已加载的收藏链接，检查后导出到拾光。","version":"1.0.0","permissions":["activeTab","scripting"],"action":{"default_popup":"popup.html","default_title":"采集到拾光"}}
+{
+  "manifest_version": 3,
+  "name": "拾光 · 一键收藏",
+  "description": "点击扩展即收藏当前网页，稍后打开拾光自动查看，无需手动导入。",
+  "version": "1.2.0",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://jiangxixu.github.io/*",
+    "https://pkgsgkrjhcckmcjqdzws.supabase.co/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "点击即收藏当前网页 · 拾光"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://jiangxixu.github.io/shiguang/*"
+      ],
+      "js": [
+        "core.js",
+        "capture-store.js",
+        "library-bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "popup.html"
+}
