@@ -48,7 +48,7 @@ if(SG.safeUrl(shared.get('url'))){
 
 $('#filter-toggle').onclick=()=>{const expanded=$('#filter-toggle').getAttribute('aria-expanded')!=='true';$('#filter-toggle').setAttribute('aria-expanded',String(expanded));document.querySelector('.toolbar').classList.toggle('filters-open',expanded);};
 
-$('#quick-add').onclick=()=>form();
+
 async function pasteLink(){
  try{let text='';if(window.ShiguangNative){text=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('请长按链接输入框粘贴')),3000);ShiguangNative.onmessage=event=>{clearTimeout(timer);try{resolve(JSON.parse(event.data).clipboard||'');}catch{reject(Error('无法读取剪贴板'));}};ShiguangNative.postMessage(JSON.stringify({action:'paste'}));});}else text=await navigator.clipboard.readText();
  const link=text.match(/https?:\/\/[^\s<>"，。；）】]+/)?.[0];if(!SG.safeUrl(link))throw Error('剪贴板中没有网页链接');$('#item-form input[name="url"]').value=link;const title=$('#item-form input[name="title"]');if(!title.value)title.value=text.replace(link,'').trim().slice(0,500)||new URL(link).hostname;

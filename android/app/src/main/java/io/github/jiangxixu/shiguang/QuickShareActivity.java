@@ -29,6 +29,7 @@ public class QuickShareActivity extends Activity {
         super.onCreate(state);
         Intent intent=getIntent();
         if(!Intent.ACTION_SEND.equals(intent.getAction())){finish();return;}
+        ShareTargets.used(this);
         String text=intent.getStringExtra(Intent.EXTRA_TEXT);
         if(text==null||text.length()>100000){complete("分享内容中未找到链接",false);return;}
         Matcher match=Pattern.compile("https?://[^\\s<>\\\"，。；）】]+").matcher(text);

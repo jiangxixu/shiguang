@@ -31,19 +31,8 @@ public class MainActivity extends Activity {
         layout.setBackgroundColor(Color.rgb(246,245,240));
         web = new WebView(this);
         layout.addView(web, new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout bar = new LinearLayout(this);
-        bar.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(16),0,dp(8),0);
-        TextView label=new TextView(this);label.setText("拾光 · "+BuildConfig.VERSION_NAME);label.setTextSize(11);label.setTextColor(Color.rgb(138,145,137));
-        bar.addView(label,new LinearLayout.LayoutParams(0,dp(44),1));label.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        TextView more=new TextView(this);more.setText("更多 ⋯");more.setTextSize(13);more.setTextColor(Color.rgb(71,101,78));more.setGravity(android.view.Gravity.CENTER);more.setContentDescription("更多操作");
-        more.setBackgroundResource(android.R.drawable.list_selector_background);more.setOnClickListener(v->{
-            PopupMenu menu=new PopupMenu(this,more);
-            menu.getMenu().add(0,1,0,"刷新收藏");menu.getMenu().add(0,2,1,"打开网页版");menu.getMenu().add(0,3,2,"关于拾光");
-            menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){case 1:web.reload();return true;case 2:external(Uri.parse(BuildConfig.WEB_URL));return true;case 3:showAbout();return true;default:return false;}});menu.show();
-        });
-        bar.addView(more,new LinearLayout.LayoutParams(dp(80),dp(44)));
-        layout.addView(bar); setContentView(layout);
+        setContentView(layout);
+        ShareTargets.publish(this);
         WebSettings settings=web.getSettings();
         settings.setJavaScriptEnabled(true); settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false); settings.setAllowContentAccess(true);
@@ -53,7 +42,7 @@ public class MainActivity extends Activity {
         WebViewAssetLoader loader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
         web.setWebViewClient(new WebViewClient(){
             @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest r){return loader.shouldInterceptRequest(r.getUrl());}
-            @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){Uri u=r.getUrl();if(isLocal(u))return false;external(u);return true;}
+            @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){Uri u=r.getUrl();if(isLocal(u)){if("/assets/".equals(u.getPath())||"/".equals(u.getPath())){v.loadUrl(HOME);return true;}return false;}external(u);return true;}
             @Override public void onReceivedSslError(WebView v,android.webkit.SslErrorHandler h,android.net.http.SslError error){h.cancel();}
         });
         web.setWebChromeClient(new WebChromeClient(){
