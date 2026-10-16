@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "拾光 · 一键收藏",
   "description": "点击扩展即收藏当前网页，稍后打开拾光自动查看，无需手动导入。",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "permissions": [
     "activeTab",
     "scripting",
