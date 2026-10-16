@@ -22,7 +22,7 @@ test('capture requires confirmation, saves optional categories and reason, and d
 test('opening library drains to site storage; full storage retains queued capture for retry',async()=>{
  const w=worker();await w.capture();let raw=null,full=true;const uiEvents=[];
  const localStorage={getItem:()=>raw,setItem:(key,value)=>{if(full)throw Error('quota');raw=value}};
- const page={chrome:{runtime:{sendMessage:w.message,onMessage:{addListener(){}}}},localStorage,ShiguangCapture:Capture,window:{dispatchEvent:event=>uiEvents.push(event),addEventListener(){}},StorageEvent:function(type,props){Object.assign(this,props)},console:{warn(){}},document:{createElement:()=>({style:{},remove(){}}),body:{append(){}}},setTimeout(){},setInterval(){}};
+ const page={chrome:{runtime:{sendMessage:w.message,onMessage:{addListener(){}}}},localStorage,ShiguangCapture:Capture,window:{dispatchEvent:event=>uiEvents.push(event),addEventListener(){}},StorageEvent:function(type,props){Object.assign(this,props)},console:{warn(){}},document:{createElement:()=>({style:{},remove(){}}),body:{append(){}}},setTimeout(){},setInterval(){},clearInterval(){}};
  const source=fs.readFileSync(path.join(__dirname,'../collector/library-bridge.js'),'utf8');
  vm.createContext(page);vm.runInContext(source,page);
  // Await the actual drain instead of sleeping; it shares a single in-flight guard.
@@ -71,4 +71,24 @@ test('category suggestions include library tags and survive queue draining witho
  w.db['shiguang.extension.owner']='another-user';await w.events.click({id:1});id=Object.keys(w.db.captureDrafts).at(-1);
  assert.equal((await w.editor({type:'SHIGUANG_CAPTURE_GET',id})).tags.length,0);
  assert.equal(await w.send({type:'SHIGUANG_CATEGORIES',tags:['非法']},{id:'test-extension',tab:{url:'https://example.com/'}}),undefined);
+});
+
+
+test('extension reload stops old bridge timers, shows one refresh notice and never acknowledges unsaved captures',async()=>{
+ for(const asyncFailure of [false,true]){
+ let sends=0,acks=0,cleared=0,warnings=0;const notices=[],removed=[];
+ const page={chrome:{runtime:{sendMessage:message=>{sends++;if(message.type==='SHIGUANG_ACK')acks++;const error=Error('Extension context invalidated.');if(asyncFailure)return Promise.reject(error);throw error;},onMessage:{addListener(){}}}},localStorage:{getItem:()=>null},ShiguangCapture:Capture,window:{addEventListener(){},removeEventListener:name=>removed.push(name)},console:{warn(){warnings++;}},document:{createElement:()=>({style:{},setAttribute(){}}),body:{append:note=>notices.push(note)}},setInterval:()=>42,clearInterval:id=>{assert.equal(id,42);cleared++;}};
+ vm.createContext(page);vm.runInContext(fs.readFileSync(path.join(__dirname,'../collector/library-bridge.js'),'utf8'),page);
+ await new Promise(resolve=>setImmediate(resolve));await vm.runInContext('drain()',page);await vm.runInContext('drain()',page);
+ assert.equal(sends,1);assert.equal(acks,0);assert.equal(cleared,1);assert.equal(warnings,0);assert.equal(notices.length,1);assert.match(notices[0].textContent,/刷新/);assert.deepEqual(removed,['storage','focus']);
+ }
+});
+
+test('stale shortcut handles synchronous invalidation and stops messaging',()=>{
+ const handlers={};let sends=0;
+ const page={Element:class{},document:{addEventListener:(key,fn)=>handlers[key]=fn,title:'教程'},window:{addEventListener(){}},getSelection:()=>({toString:()=>''}),chrome:{runtime:{sendMessage(){sends++;throw Error('Extension context invalidated.');}}}};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../collector/shortcut.js'),'utf8'),page);
+ const event=code=>({code,composedPath:()=>[],preventDefault(){},stopPropagation(){}});
+ for(let i=0;i<2;i++){handlers.keydown(event('Space'));assert.doesNotThrow(()=>handlers.keydown(event('KeyS')));handlers.keyup(event('Space'));}
+ assert.equal(sends,1);
 });

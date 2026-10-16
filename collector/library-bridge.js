@@ -1,8 +1,16 @@
 'use strict';
 // Runs only on the published library, in the extension's isolated world.
-let draining=false;
+let draining=false,disconnected=false,retryTimer;
+function ownerChanged(event){if(event.key==='shiguang.cloud.owner')drain();}
+function stopOldBridge(){
+ if(disconnected)return;disconnected=true;
+ clearInterval(retryTimer);window.removeEventListener('storage',ownerChanged);window.removeEventListener('focus',drain);
+ const note=document.createElement('div');note.textContent='拾光扩展已更新，请刷新此网页以恢复收藏同步。';note.setAttribute('role','status');
+ Object.assign(note.style,{position:'fixed',bottom:'24px',right:'24px',zIndex:'2147483647',background:'#354936',color:'#fff',padding:'14px 20px',borderRadius:'8px',font:'14px sans-serif'});
+ document.body.append(note);
+}
 async function drain(){
- if(draining)return;draining=true;
+ if(disconnected||draining)return;draining=true;
  try{
   let totalAdded=0;
   while(true){
@@ -22,12 +30,13 @@ async function drain(){
   Object.assign(note.style,{position:'fixed',bottom:'24px',right:'24px',zIndex:'2147483647',background:'#354936',color:'#fff',padding:'14px 20px',borderRadius:'8px',font:'14px sans-serif'});
   document.body.append(note);setTimeout(()=>note.remove(),4000);
  }catch(e){
+  if(/extension context invalidated/i.test(e?.message||'')){stopOldBridge();return;}
   // Keep the extension queue intact on corrupt/full/blocked site storage.
   console.warn('拾光：归档失败，收藏仍保留在扩展中。',e.message);
  }finally{draining=false;}
 }
 chrome.runtime.onMessage.addListener(message=>{if(message.type==='SHIGUANG_SYNC'){drain();return false;}});
-window.addEventListener('storage',event=>{if(event.key==='shiguang.cloud.owner')drain();});
+window.addEventListener('storage',ownerChanged);
 window.addEventListener('focus',drain);
-setInterval(drain,30000);
+retryTimer=setInterval(drain,30000);
 drain();
