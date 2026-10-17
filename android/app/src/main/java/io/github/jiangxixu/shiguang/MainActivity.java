@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
         WebViewAssetLoader loader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
         web.setWebViewClient(new WebViewClient(){
             @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest r){Uri u=r.getUrl();if(isLocal(u)&&("/assets/".equals(u.getPath())||"/".equals(u.getPath())))u=Uri.parse(HOME);return loader.shouldInterceptRequest(u);}
-            @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){Uri u=r.getUrl();if(isLocal(u)){if("/assets/".equals(u.getPath())||"/".equals(u.getPath())){v.loadUrl(HOME);return true;}return false;}external(u);return true;}
+            @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){Uri u=r.getUrl();if(isLocal(u)){if("/assets/".equals(u.getPath())||"/".equals(u.getPath())){v.loadUrl(HOME);return true;}return false;}if(r.isForMainFrame())external(u);return true;}
             @Override public void onPageFinished(WebView v,String url){if(isLocal(Uri.parse(url)))v.evaluateJavascript("document.documentElement.dataset.appVersion="+JSONObject.quote(BuildConfig.VERSION_NAME),null);}
             @Override public void onReceivedSslError(WebView v,android.webkit.SslErrorHandler h,android.net.http.SslError error){h.cancel();}
         });
@@ -67,6 +67,7 @@ public class MainActivity extends Activity {
                         JSONObject response=new JSONObject();response.put("clipboard",text.substring(0,Math.min(10000,text.length())));reply.postMessage(response.toString());return;
                     }
                     String action=data.optString("action");
+                    if("openLink".equals(action)){external(Uri.parse(data.optString("url")));return;}
                     if("enableFloating".equals(action)){enableFloating();return;}
                     if("disableFloating".equals(action)){stopService(new Intent(this,FloatingCaptureService.class));Toast.makeText(this,"悬浮收藏已关闭",Toast.LENGTH_SHORT).show();return;}
                     if("captureClipboard".equals(action)){startActivity(new Intent(this,ClipboardCaptureActivity.class));return;}
@@ -118,7 +119,14 @@ public class MainActivity extends Activity {
     private boolean isLocal(Uri u){return "https".equals(u.getScheme())&&"appassets.androidplatform.net".equals(u.getHost());}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
     private void showAbout(){new android.app.AlertDialog.Builder(this).setTitle("拾光 "+BuildConfig.VERSION_NAME).setMessage("在 App 和网站使用同一个邮箱登录，即可同步收藏。离线时先保存在本机，打开 App 或再次分享时补传。\n\n在其他 App 中选择分享链接到「拾光」，即可保存。\n\n更新：github.com/jiangxixu/shiguang\n卸载或清除数据前，请确认同步完成或导出备份。").setPositiveButton("知道了",null).show();}
-    private void external(Uri u){if(!"https".equals(u.getScheme())&&!"http".equals(u.getScheme()))return;try{startActivity(new Intent(Intent.ACTION_VIEW,u));}catch(Exception ignored){Toast.makeText(this,"没有可打开链接的浏览器",Toast.LENGTH_SHORT).show();}}
+    private void external(Uri u){
+        boolean opened=PlatformLinks.open(u.toString(),(url,pkg)->{
+            Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE);
+            if(pkg!=null)intent.setPackage(pkg);
+            try{startActivity(intent);return true;}catch(android.content.ActivityNotFoundException|SecurityException e){return false;}
+        });
+        if(!opened)Toast.makeText(this,"暂时无法打开此链接，请检查相关 App 或浏览器是否可用",Toast.LENGTH_LONG).show();
+    }
     private void loadIntent(Intent intent){
         if(Intent.ACTION_SEND.equals(intent.getAction())){
             String text=intent.getStringExtra(Intent.EXTRA_TEXT);if(text!=null){
