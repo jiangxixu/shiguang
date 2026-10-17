@@ -21,11 +21,13 @@ public class MainActivity extends Activity {
     private static final String ORIGIN = "https://appassets.androidplatform.net";
     private static final String HOME = ORIGIN + "/assets/index.html";
     private WebView web;
+    private boolean awaitingOverlayPermission;
     private ValueCallback<Uri[]> fileCallback;
     private byte[] pendingExport;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        awaitingOverlayPermission=state!=null&&state.getBoolean("awaitingOverlayPermission",false);
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setBackgroundColor(Color.rgb(246,245,240));
@@ -65,6 +67,8 @@ public class MainActivity extends Activity {
                         JSONObject response=new JSONObject();response.put("clipboard",text.substring(0,Math.min(10000,text.length())));reply.postMessage(response.toString());return;
                     }
                     String action=data.optString("action");
+                    if("enableFloating".equals(action)){enableFloating();return;}
+                    if("disableFloating".equals(action)){stopService(new Intent(this,FloatingCaptureService.class));Toast.makeText(this,"悬浮收藏已关闭",Toast.LENGTH_SHORT).show();return;}
                     if("captureClipboard".equals(action)){startActivity(new Intent(this,ClipboardCaptureActivity.class));return;}
                     if("pinCapture".equals(action)){ShareTargets.pin(this);return;}
                     if("addCaptureTile".equals(action)){addCaptureTile();return;}
@@ -81,6 +85,25 @@ public class MainActivity extends Activity {
         PreviewBridge.install(this,web);
         loadIntent(getIntent());
     }
+    private void enableFloating(){
+        if(android.provider.Settings.canDrawOverlays(this)){startFloating();return;}
+        new android.app.AlertDialog.Builder(this).setTitle("开启悬浮收藏")
+            .setMessage("请在下一页为拾光允许「显示在其他应用上层」。开启后：复制链接 → 点悬浮球 → 分类保存。拖到左右边缘可收起，长按可关闭。不会后台读取剪贴板。")
+            .setNegativeButton("暂不开启",null).setPositiveButton("前往允许",(dialog,which)->{
+                awaitingOverlayPermission=true;
+                try{startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}
+                catch(Exception e){awaitingOverlayPermission=false;Toast.makeText(this,"请到系统设置 → 应用 → 拾光，允许显示在其他应用上层",Toast.LENGTH_LONG).show();}
+            }).show();
+    }
+    private void startFloating(){
+        try{
+            if(android.os.Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},12);
+            startForegroundService(new Intent(this,FloatingCaptureService.class));
+            Toast.makeText(this,"悬浮球已开启：拖到边缘收起，点把手展开，长按关闭",Toast.LENGTH_LONG).show();
+        }catch(Exception e){Toast.makeText(this,"开启失败，请检查悬浮窗权限后重试",Toast.LENGTH_LONG).show();}
+    }
+    @Override protected void onSaveInstanceState(Bundle state){state.putBoolean("awaitingOverlayPermission",awaitingOverlayPermission);super.onSaveInstanceState(state);}
     private void addCaptureTile(){
         if(android.os.Build.VERSION.SDK_INT>=33){
             try{
@@ -110,7 +133,7 @@ public class MainActivity extends Activity {
         if(request==10&&fileCallback!=null){fileCallback.onReceiveValue(result==RESULT_OK&&data!=null&&data.getData()!=null?new Uri[]{data.getData()}:null);fileCallback=null;}
         if(request==11){byte[] bytes=pendingExport;pendingExport=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null&&bytes!=null){try(OutputStream out=getContentResolver().openOutputStream(data.getData())){if(out==null)throw new Exception();out.write(bytes);Toast.makeText(this,"备份已保存",Toast.LENGTH_SHORT).show();}catch(Exception e){Toast.makeText(this,"保存失败，请重试导出备份",Toast.LENGTH_LONG).show();}}}
     }
-    @Override protected void onResume(){super.onResume();if(web!=null)web.evaluateJavascript("window.dispatchEvent(new Event('shiguang-refresh'));window.ShiguangCloud?.schedule()",null);}
+    @Override protected void onResume(){super.onResume();if(awaitingOverlayPermission){awaitingOverlayPermission=false;if(android.provider.Settings.canDrawOverlays(this))startFloating();else Toast.makeText(this,"尚未允许悬浮窗，可在「我」中重新开启",Toast.LENGTH_LONG).show();}if(web!=null)web.evaluateJavascript("window.dispatchEvent(new Event('shiguang-refresh'));window.ShiguangCloud?.schedule()",null);}
     @Override public void onBackPressed(){if(web.canGoBack())web.goBack();else super.onBackPressed();}
     @Override protected void onDestroy(){if(fileCallback!=null)fileCallback.onReceiveValue(null);web.destroy();super.onDestroy();}
 }
