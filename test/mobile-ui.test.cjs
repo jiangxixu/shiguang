@@ -16,3 +16,22 @@ test('brand resolves to a real packaged page; removed floating collector is not 
  assert.equal(new URL(href,'https://appassets.androidplatform.net/assets/index.html').pathname,'/assets/index.html');
  assert.ok(!html.includes('id="quick-add"'));assert.ok(!fs.readFileSync('dist/app.js','utf8').includes("$('#quick-add').onclick"));
 });
+
+test('native capture setup sends only the action explicitly tapped; website hides Android setup',()=>{
+ const source=fs.readFileSync('dist/app.js','utf8').split('\n').find(line=>line.startsWith('function settings()'));
+ let html='',sent=[];const controls={};
+ const buttons=['addCaptureTile','pinCapture','captureClipboard'].map(action=>({dataset:{nativeAction:action}}));
+ const context={items:[],storageFailed:false,window:{ShiguangNative:{postMessage:raw=>sent.push(JSON.parse(raw))}},document:{documentElement:{dataset:{appVersion:'1.5.3'}},querySelectorAll:()=>buttons},esc:x=>x,openModal:(title,body)=>html=body,$:id=>controls[id]??={},backup(){},importDialog(){}};
+ vm.runInNewContext(source+';settings()',context);
+ assert.match(html,/Android 1.5.3/);assert.match(html,/添加下拉快捷按钮/);assert.equal(sent.length,0);
+ buttons[0].onclick();buttons[1].onclick();buttons[2].onclick();
+ assert.deepEqual(sent,[{action:'addCaptureTile'},{action:'pinCapture'},{action:'captureClipboard'}]);
+ context.window={};vm.runInNewContext('settings()',context);assert.ok(!html.includes('data-native-action'));
+});
+
+test('brand returns to library without navigating to an Android asset directory',()=>{
+ const source=fs.readFileSync('dist/app.js','utf8').split('\n').find(line=>line.startsWith("$('.brand').onclick="));
+ const brand={};let prevented=false,reset=false,rendered=false,scrolled=false;
+ vm.runInNewContext(source,{$:()=>brand,resetFilters:()=>reset=true,render:()=>rendered=true,window:{scrollTo:()=>scrolled=true}});
+ brand.onclick({preventDefault:()=>prevented=true});assert.ok(prevented&&reset&&rendered&&scrolled);
+});

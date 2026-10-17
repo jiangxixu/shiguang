@@ -41,8 +41,9 @@ public class MainActivity extends Activity {
         settings.setSupportMultipleWindows(false);
         WebViewAssetLoader loader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
         web.setWebViewClient(new WebViewClient(){
-            @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest r){return loader.shouldInterceptRequest(r.getUrl());}
+            @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest r){Uri u=r.getUrl();if(isLocal(u)&&("/assets/".equals(u.getPath())||"/".equals(u.getPath())))u=Uri.parse(HOME);return loader.shouldInterceptRequest(u);}
             @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){Uri u=r.getUrl();if(isLocal(u)){if("/assets/".equals(u.getPath())||"/".equals(u.getPath())){v.loadUrl(HOME);return true;}return false;}external(u);return true;}
+            @Override public void onPageFinished(WebView v,String url){if(isLocal(Uri.parse(url)))v.evaluateJavascript("document.documentElement.dataset.appVersion="+JSONObject.quote(BuildConfig.VERSION_NAME),null);}
             @Override public void onReceivedSslError(WebView v,android.webkit.SslErrorHandler h,android.net.http.SslError error){h.cancel();}
         });
         web.setWebChromeClient(new WebChromeClient(){
@@ -63,6 +64,10 @@ public class MainActivity extends Activity {
                         String text="";if(clipboard.hasPrimaryClip()&&clipboard.getPrimaryClip().getItemCount()>0){CharSequence value=clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);if(value!=null)text=value.toString();}
                         JSONObject response=new JSONObject();response.put("clipboard",text.substring(0,Math.min(10000,text.length())));reply.postMessage(response.toString());return;
                     }
+                    String action=data.optString("action");
+                    if("captureClipboard".equals(action)){startActivity(new Intent(this,ClipboardCaptureActivity.class));return;}
+                    if("pinCapture".equals(action)){ShareTargets.pin(this);return;}
+                    if("addCaptureTile".equals(action)){addCaptureTile();return;}
                     String name=data.getString("name");
                     if(!name.matches("[^/\\\\]{1,120}\\.(json|csv)"))throw new Exception();
                     if(pendingExport!=null){Toast.makeText(this,"请先完成上一次文件保存",Toast.LENGTH_SHORT).show();return;}
@@ -75,6 +80,17 @@ public class MainActivity extends Activity {
         web.setDownloadListener((url,ua,disposition,mime,length)->{if(url.startsWith("https://"))external(Uri.parse(url));else Toast.makeText(this,"请更新 Android System WebView 后重试导出",Toast.LENGTH_LONG).show();});
         PreviewBridge.install(this,web);
         loadIntent(getIntent());
+    }
+    private void addCaptureTile(){
+        if(android.os.Build.VERSION.SDK_INT>=33){
+            try{
+                getSystemService(android.app.StatusBarManager.class).requestAddTileService(new android.content.ComponentName(this,CaptureTileService.class),"拾光收藏",android.graphics.drawable.Icon.createWithResource(this,R.drawable.ic_capture_tile),getMainExecutor(),result->{
+                    boolean added=result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED||result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED;
+                    Toast.makeText(this,added?"已添加：复制链接后，下拉点「拾光收藏」":"未添加。可下拉两次 → 编辑按钮 → 拖入「拾光收藏」",Toast.LENGTH_LONG).show();
+                });return;
+            }catch(Exception ignored){}
+        }
+        new android.app.AlertDialog.Builder(this).setTitle("添加拾光收藏按钮").setMessage("从屏幕顶部下拉两次，点击编辑按钮（铅笔或更多），找到「拾光收藏」并拖到常用区域。以后复制链接，下拉点它即可选择分类并收藏。").setPositiveButton("知道了",null).show();
     }
     private boolean isLocal(Uri u){return "https".equals(u.getScheme())&&"appassets.androidplatform.net".equals(u.getHost());}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}

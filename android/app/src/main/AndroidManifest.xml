@@ -10,5 +10,9 @@
         <activity android:name=".QuickShareActivity" android:exported="true" android:excludeFromRecents="true" android:noHistory="true" android:taskAffinity="" android:windowSoftInputMode="adjustResize" android:theme="@style/ShareTheme">
             <intent-filter><action android:name="android.intent.action.SEND" /><category android:name="android.intent.category.DEFAULT" /><data android:mimeType="text/plain" /><data android:mimeType="text/html" /></intent-filter>
         </activity>
+        <activity android:name=".ClipboardCaptureActivity" android:exported="true" android:excludeFromRecents="true" android:taskAffinity="" />
+        <service android:name=".CaptureTileService" android:label="拾光收藏" android:icon="@drawable/ic_capture_tile" android:exported="true" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
     </application>
 </manifest>
