@@ -90,7 +90,7 @@ public class MainActivity extends Activity {
     }
     private void updateAutoState(){
         if(web==null)return;
-        String status=FavoriteCaptureService.enabled(this)&&FavoriteCaptureService.active()?"已开启 · "+FavoriteCaptureService.status(this):"未开启 · 请在系统无障碍设置开启收藏跟随";
+        String status=!FavoriteCaptureService.enabled(this)?"拾光内开关未开启 · 请点击下方「开启收藏跟随」完成授权":!FavoriteCaptureService.active()?"系统服务未连接 · 请在无障碍设置检查拾光。最近记录："+FavoriteCaptureService.status(this):"已开启 · "+FavoriteCaptureService.status(this);
         web.evaluateJavascript("(()=>{document.documentElement.dataset.autoCaptureStatus="+JSONObject.quote(status)+";const s=document.getElementById('auto-capture-status');if(s)s.textContent=document.documentElement.dataset.autoCaptureStatus;})()",null);
     }
     private void enableAutoCapture(){

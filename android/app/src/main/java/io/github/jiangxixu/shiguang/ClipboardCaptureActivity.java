@@ -19,7 +19,7 @@ public class ClipboardCaptureActivity extends Activity {
         Button cancel=new Button(this);cancel.setText("返回");cancel.setOnClickListener(v->finish());layout.addView(cancel);
         setContentView(layout);
     }
-    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused&&!attempted){attempted=true;status.post(this::readClipboard);}}
+    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused&&!attempted){attempted=true;if(getIntent().hasExtra("expectedPackage"))FavoriteCaptureService.acknowledge(this,getIntent().getLongExtra("notBefore",0));status.post(this::readClipboard);}}
     private void readClipboard(){
         if(!hasWindowFocus())return;
         try{
@@ -28,7 +28,7 @@ public class ClipboardCaptureActivity extends Activity {
                 String expected=getIntent().getStringExtra("expectedPackage");
                 if(expected!=null){
                     android.content.ClipDescription description=clipboard.getPrimaryClipDescription();
-                    if(description==null||description.getTimestamp()<getIntent().getLongExtra("notBefore",Long.MAX_VALUE)-100){status.setText("没有取得这次收藏的新链接，未保存。请在原内容的分享菜单复制链接后重试。");return;}
+                    if(description==null||description.getTimestamp()<getIntent().getLongExtra("notBefore",Long.MAX_VALUE)-100){message("没有取得这次收藏的新链接，未保存。请在原内容的分享菜单复制链接后重试。");return;}
                 }
                 CharSequence value=clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
                 String text=value==null?"":value.toString();
@@ -36,13 +36,15 @@ public class ClipboardCaptureActivity extends Activity {
                     java.util.regex.Matcher links=Pattern.compile("https?://[^\\s<>\\\"，。；）】]+").matcher(text);
                     boolean matches=false;
                     while(links.find()){String link=links.group().replaceAll("[)\\].,;!]+$","");if(FavoriteRules.contentUrl(expected,link)){text=link;matches=true;break;}}
-                    if(!matches){status.setText("没有取得对应平台的原内容链接，未保存。不会用主页或旧剪贴板内容代替。");return;}
+                    if(!matches){message("没有取得对应平台的原内容链接，未保存。不会用主页或旧剪贴板内容代替。");return;}
                 }
                 if(text.length()<=100000&&Pattern.compile("https?://[^\\s<>]+").matcher(text).find()){
+                    if(expected!=null)FavoriteCaptureService.report(this,"原内容链接校验通过，正在打开分类窗口（尚未保存）");
                     startActivity(new Intent(this,QuickShareActivity.class).setAction(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text));finish();return;
                 }
             }
-            status.setText("没有读到网页链接。请先在原 App 选择「复制链接」，再点拾光收藏。下一步可选择分类、填写原因。");
-        }catch(Exception e){status.setText("暂时无法读取剪贴板，请复制链接后重试，或使用原 App 的分享 → 拾光。");}
+            message("没有读到网页链接。请先在原 App 选择「复制链接」，再点拾光收藏。下一步可选择分类、填写原因。");
+        }catch(Exception e){message("暂时无法读取剪贴板，请复制链接后重试，或使用原 App 的分享 → 拾光。");}
     }
+    private void message(String text){status.setText(text);if(getIntent().hasExtra("expectedPackage"))FavoriteCaptureService.report(this,text);}
 }
