@@ -21,5 +21,9 @@
         <service android:name=".FloatingCaptureService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-enabled draggable overlay for saving copied links, with edge docking and explicit stop controls. No background clipboard monitoring." />
         </service>
+        <service android:name=".FavoriteCaptureService" android:label="拾光 · 收藏跟随（试用）" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/favorite_accessibility" />
+        </service>
     </application>
 </manifest>

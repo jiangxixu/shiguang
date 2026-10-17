@@ -5,3 +5,12 @@ test('CSV handles quotes, newlines, BOM, Chinese columns and Takeout',()=>{const
 test('JSON restores status and merge preserves current notes',()=>{const a=SG.normalize({url:'https://example.com',notes:'keep',read:true,starred:true});const b=SG.parseFile(JSON.stringify({items:[a,{url:'javascript:bad'}]}),'b.json');assert.equal(b.length,1);assert.equal(b[0].read,true);const r=SG.merge([a],[{url:a.url,notes:'overwrite'}]);assert.equal(r.items[0].notes,'keep');assert.equal(r.duplicates,1)});
 test('search combines notes and tags with platform and read filters',()=>{const arr=[SG.normalize({url:'https://www.bilibili.com/video/BV1',title:'函数',tags:['Python'],notes:'递归',read:false}),SG.normalize({url:'https://example.com',title:'Python'})];assert.equal(SG.filter(arr,{q:'python 递归',platform:'bilibili',view:'unread'}).length,1);assert.equal(SG.filter(arr,{view:'read'}).length,0)});
 test('duplicate IDs are repaired, invalid dates normalized and tags bounded',()=>{const a=SG.normalize({url:'https://example.com/1',id:'same'});const r=SG.merge([a],[{url:'https://example.com/2',id:'same',date:'invalid',tags:[null,1,' a ','a']}]);assert.notEqual(r.items[0].id,r.items[1].id);assert.deepEqual(r.items[0].tags,['a']);assert.ok(Number.isFinite(Date.parse(r.items[0].createdAt)))});
+test('Xiaohongshu cn short links and old other-site records regain their platform without losing tokens',()=>{
+ for(const file of ['../dist/core.js','../collector/core.js']){
+  const core=require(file),url='https://xhslink.cn/o/abc?xsec_token=a%2Bb';
+  assert.equal(core.detect(url),'xiaohongshu');
+  const item=core.normalize({url,platform:'other',title:'笔记',tags:['机器人'],notes:'收藏原因'});
+  assert.equal(item.platform,'xiaohongshu');assert.equal(item.url,url);assert.deepEqual(item.tags,['机器人']);assert.equal(item.notes,'收藏原因');
+  assert.equal(core.detect('https://xhslink.cn.evil.test/o/abc'),'other');
+ }
+});

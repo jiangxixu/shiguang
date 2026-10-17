@@ -25,8 +25,19 @@ public class ClipboardCaptureActivity extends Activity {
         try{
             ClipboardManager clipboard=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
             if(clipboard.hasPrimaryClip()&&clipboard.getPrimaryClip().getItemCount()>0){
+                String expected=getIntent().getStringExtra("expectedPackage");
+                if(expected!=null){
+                    android.content.ClipDescription description=clipboard.getPrimaryClipDescription();
+                    if(description==null||description.getTimestamp()<getIntent().getLongExtra("notBefore",Long.MAX_VALUE)-100){status.setText("没有取得这次收藏的新链接，未保存。请在原内容的分享菜单复制链接后重试。");return;}
+                }
                 CharSequence value=clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
                 String text=value==null?"":value.toString();
+                if(expected!=null){
+                    java.util.regex.Matcher links=Pattern.compile("https?://[^\\s<>\\\"，。；）】]+").matcher(text);
+                    boolean matches=false;
+                    while(links.find()){String link=links.group().replaceAll("[)\\].,;!]+$","");if(FavoriteRules.contentUrl(expected,link)){text=link;matches=true;break;}}
+                    if(!matches){status.setText("没有取得对应平台的原内容链接，未保存。不会用主页或旧剪贴板内容代替。");return;}
+                }
                 if(text.length()<=100000&&Pattern.compile("https?://[^\\s<>]+").matcher(text).find()){
                     startActivity(new Intent(this,QuickShareActivity.class).setAction(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text));finish();return;
                 }

@@ -45,7 +45,7 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient(){
             @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest r){Uri u=r.getUrl();if(isLocal(u)&&("/assets/".equals(u.getPath())||"/".equals(u.getPath())))u=Uri.parse(HOME);return loader.shouldInterceptRequest(u);}
             @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){Uri u=r.getUrl();if(isLocal(u)){if("/assets/".equals(u.getPath())||"/".equals(u.getPath())){v.loadUrl(HOME);return true;}return false;}if(r.isForMainFrame())external(u);return true;}
-            @Override public void onPageFinished(WebView v,String url){if(isLocal(Uri.parse(url)))v.evaluateJavascript("document.documentElement.dataset.appVersion="+JSONObject.quote(BuildConfig.VERSION_NAME),null);}
+            @Override public void onPageFinished(WebView v,String url){if(isLocal(Uri.parse(url))){v.evaluateJavascript("document.documentElement.dataset.appVersion="+JSONObject.quote(BuildConfig.VERSION_NAME),null);updateAutoState();}}
             @Override public void onReceivedSslError(WebView v,android.webkit.SslErrorHandler h,android.net.http.SslError error){h.cancel();}
         });
         web.setWebChromeClient(new WebChromeClient(){
@@ -67,6 +67,8 @@ public class MainActivity extends Activity {
                         JSONObject response=new JSONObject();response.put("clipboard",text.substring(0,Math.min(10000,text.length())));reply.postMessage(response.toString());return;
                     }
                     String action=data.optString("action");
+                    if("enableAutoCapture".equals(action)){enableAutoCapture();return;}
+                    if("disableAutoCapture".equals(action)){FavoriteCaptureService.pause(this);updateAutoState();Toast.makeText(this,"自动跟随收藏已关闭",Toast.LENGTH_SHORT).show();return;}
                     if("openLink".equals(action)){external(Uri.parse(data.optString("url")));return;}
                     if("enableFloating".equals(action)){enableFloating();return;}
                     if("disableFloating".equals(action)){stopService(new Intent(this,FloatingCaptureService.class));Toast.makeText(this,"悬浮收藏已关闭",Toast.LENGTH_SHORT).show();return;}
@@ -85,6 +87,21 @@ public class MainActivity extends Activity {
         web.setDownloadListener((url,ua,disposition,mime,length)->{if(url.startsWith("https://"))external(Uri.parse(url));else Toast.makeText(this,"请更新 Android System WebView 后重试导出",Toast.LENGTH_LONG).show();});
         PreviewBridge.install(this,web);
         loadIntent(getIntent());
+    }
+    private void updateAutoState(){
+        if(web==null)return;
+        String status=FavoriteCaptureService.enabled(this)&&FavoriteCaptureService.active()?"已开启 · "+FavoriteCaptureService.status(this):"未开启 · 请在系统无障碍设置开启收藏跟随";
+        web.evaluateJavascript("(()=>{document.documentElement.dataset.autoCaptureStatus="+JSONObject.quote(status)+";const s=document.getElementById('auto-capture-status');if(s)s.textContent=document.documentElement.dataset.autoCaptureStatus;})()",null);
+    }
+    private void enableAutoCapture(){
+        new android.app.AlertDialog.Builder(this).setTitle("启用收藏跟随（试用）")
+            .setMessage("仅适配小红书、B站的可识别按钮。允许拾光读取这些 App 的按钮文字和收藏状态；识别收藏后，尝试自动打开分享菜单并点击复制链接，再弹出分类窗口。只有你确认保存，原链接及填写的信息才会同步。\n\n不读取密码、不上传页面树，不操作点赞或取消收藏。没有取得新原链接就不保存。不同版本可能无法识别，尚未在你的手机验证。可随时关闭。")
+            .setNegativeButton("暂不开启",null).setPositiveButton("同意并前往系统开启",(dialog,which)->{
+                stopService(new Intent(this,FloatingCaptureService.class));
+                getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",true).apply();
+                try{startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));}
+                catch(Exception e){Toast.makeText(this,"请到系统设置 → 无障碍，开启「拾光 · 收藏跟随（试用）」",Toast.LENGTH_LONG).show();}
+            }).show();
     }
     private void enableFloating(){
         if(android.provider.Settings.canDrawOverlays(this)){startFloating();return;}
@@ -121,7 +138,7 @@ public class MainActivity extends Activity {
     private void showAbout(){new android.app.AlertDialog.Builder(this).setTitle("拾光 "+BuildConfig.VERSION_NAME).setMessage("在 App 和网站使用同一个邮箱登录，即可同步收藏。离线时先保存在本机，打开 App 或再次分享时补传。\n\n在其他 App 中选择分享链接到「拾光」，即可保存。\n\n更新：github.com/jiangxixu/shiguang\n卸载或清除数据前，请确认同步完成或导出备份。").setPositiveButton("知道了",null).show();}
     private void external(Uri u){
         boolean opened=PlatformLinks.open(u.toString(),(url,pkg)->{
-            Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE);
+            Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse(url));if(url.startsWith("http:" )||url.startsWith("https:"))intent.addCategory(Intent.CATEGORY_BROWSABLE);
             if(pkg!=null)intent.setPackage(pkg);
             try{startActivity(intent);return true;}catch(android.content.ActivityNotFoundException|SecurityException e){return false;}
         });
@@ -141,7 +158,7 @@ public class MainActivity extends Activity {
         if(request==10&&fileCallback!=null){fileCallback.onReceiveValue(result==RESULT_OK&&data!=null&&data.getData()!=null?new Uri[]{data.getData()}:null);fileCallback=null;}
         if(request==11){byte[] bytes=pendingExport;pendingExport=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null&&bytes!=null){try(OutputStream out=getContentResolver().openOutputStream(data.getData())){if(out==null)throw new Exception();out.write(bytes);Toast.makeText(this,"备份已保存",Toast.LENGTH_SHORT).show();}catch(Exception e){Toast.makeText(this,"保存失败，请重试导出备份",Toast.LENGTH_LONG).show();}}}
     }
-    @Override protected void onResume(){super.onResume();if(awaitingOverlayPermission){awaitingOverlayPermission=false;if(android.provider.Settings.canDrawOverlays(this))startFloating();else Toast.makeText(this,"尚未允许悬浮窗，可在「我」中重新开启",Toast.LENGTH_LONG).show();}if(web!=null)web.evaluateJavascript("window.dispatchEvent(new Event('shiguang-refresh'));window.ShiguangCloud?.schedule()",null);}
+    @Override protected void onResume(){super.onResume();if(awaitingOverlayPermission){awaitingOverlayPermission=false;if(android.provider.Settings.canDrawOverlays(this))startFloating();else Toast.makeText(this,"尚未允许悬浮窗，可在「我」中重新开启",Toast.LENGTH_LONG).show();}if(web!=null)updateAutoState();if(web!=null)web.evaluateJavascript("window.dispatchEvent(new Event('shiguang-refresh'));window.ShiguangCloud?.schedule()",null);}
     @Override public void onBackPressed(){if(web.canGoBack())web.goBack();else super.onBackPressed();}
     @Override protected void onDestroy(){if(fileCallback!=null)fileCallback.onReceiveValue(null);web.destroy();super.onDestroy();}
 }

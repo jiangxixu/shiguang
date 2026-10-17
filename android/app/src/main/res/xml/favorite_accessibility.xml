@@ -1,0 +1,10 @@
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/favorite_accessibility_description"
+    android:packageNames="com.xingin.xhs,tv.danmaku.bili,com.bilibili.app.in"
+    android:accessibilityEventTypes="typeViewClicked|typeViewScrolled|typeWindowContentChanged|typeNotificationStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="true"
+    android:isAccessibilityTool="false"
+    android:settingsActivity="io.github.jiangxixu.shiguang.MainActivity" />
