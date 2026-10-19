@@ -14,8 +14,6 @@ import androidx.webkit.WebViewFeature;
 import java.util.Collections;
 import org.json.JSONObject;
 import org.json.JSONArray;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /** Shows optional categories and reason before saving a shared link. */
 public class QuickShareActivity extends Activity {
@@ -32,12 +30,19 @@ public class QuickShareActivity extends Activity {
         ShareTargets.used(this);
         String text=intent.getStringExtra(Intent.EXTRA_TEXT);
         if(text==null||text.length()>100000){complete("分享内容中未找到链接",false);return;}
-        Matcher match=Pattern.compile("https?://[^\\s<>\\\"，。；）】]+").matcher(text);
-        if(!match.find()){complete("分享内容中未找到链接，请选择复制链接或分享链接",false);return;}
-        String link=match.group().replaceAll("[)\\].,;!]+$","");
-        String subject=intent.getStringExtra(Intent.EXTRA_SUBJECT);
+        java.util.List<String> links=ShareLinks.candidates(text);
+        if(links.isEmpty()){complete("分享内容中未找到有效链接，请选择复制链接或分享链接",false);return;}
+        if(links.size()>1){
+            String[] choices=new String[links.size()];for(int i=0;i<links.size();i++)choices[i]=ShareLinks.platformName(links.get(i))+"\n"+links.get(i);
+            new android.app.AlertDialog.Builder(this).setTitle("复制内容里有多个链接，请选择要收藏的内容")
+                .setItems(choices,(dialog,index)->showCapture(links.get(index),text,intent.getStringExtra(Intent.EXTRA_SUBJECT)))
+                .setNegativeButton("取消",(dialog,index)->finish()).setOnCancelListener(dialog->finish()).show();return;
+        }
+        showCapture(links.get(0),text,intent.getStringExtra(Intent.EXTRA_SUBJECT));
+    }
+    private void showCapture(String link,String text,String subject){
         String title=subject==null?"":subject.trim();
-        if(title.isEmpty())title=text.replace(match.group(),"").replaceAll("^[\\s\\-—:：]+|[\\s\\-—:：]+$","");
+        if(title.isEmpty())title=text.replace(link,"").replaceAll("^[\\s\\-—:：]+|[\\s\\-—:：]+$","");
         if(title.isEmpty())title=Uri.parse(link).getHost();
         JSONObject item=new JSONObject();
         try{item.put("url",link);item.put("title",title==null?"收藏链接":title.substring(0,Math.min(500,title.length())));}catch(Exception e){complete("无法读取分享内容",false);return;}

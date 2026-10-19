@@ -24,6 +24,7 @@ public class MainActivity extends Activity {
     private boolean awaitingOverlayPermission;
     private ValueCallback<Uri[]> fileCallback;
     private byte[] pendingExport;
+    private boolean openingXhs;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -137,6 +138,21 @@ public class MainActivity extends Activity {
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
     private void showAbout(){new android.app.AlertDialog.Builder(this).setTitle("拾光 "+BuildConfig.VERSION_NAME).setMessage("在 App 和网站使用同一个邮箱登录，即可同步收藏。离线时先保存在本机，打开 App 或再次分享时补传。\n\n在其他 App 中选择分享链接到「拾光」，即可保存。\n\n更新：github.com/jiangxixu/shiguang\n卸载或清除数据前，请确认同步完成或导出备份。").setPositiveButton("知道了",null).show();}
     private void external(Uri u){
+        String original=u.toString();
+        if(XhsLinks.shortLink(original)){
+            if(openingXhs)return;openingXhs=true;Toast.makeText(this,"正在解析小红书原内容…",Toast.LENGTH_SHORT).show();
+            new Thread(()->{String resolved=XhsRedirects.resolve(original);runOnUiThread(()->{
+                openingXhs=false;if(isFinishing()||isDestroyed())return;
+                if(XhsLinks.noteId(resolved)!=null){openExternal(Uri.parse(resolved));return;}
+                new android.app.AlertDialog.Builder(this).setTitle("暂时未能解析小红书原链接")
+                    .setMessage("没有取得笔记地址，无法准确直达小红书原内容。可以联网重试，或自行选择浏览器打开原链接。")
+                    .setPositiveButton("重试",(dialog,index)->external(u)).setNegativeButton("取消",null)
+                    .setNeutralButton("浏览器打开",(dialog,index)->{try{startActivity(new Intent(Intent.ACTION_VIEW,u).addCategory(Intent.CATEGORY_BROWSABLE));}catch(Exception e){Toast.makeText(this,"没有可用的打开方式",Toast.LENGTH_LONG).show();}}).show();
+            });},"shiguang-xhs-link").start();return;
+        }
+        openExternal(u);
+    }
+    private void openExternal(Uri u){
         boolean opened=PlatformLinks.open(u.toString(),(url,pkg)->{
             Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse(url));if(url.startsWith("http:" )||url.startsWith("https:"))intent.addCategory(Intent.CATEGORY_BROWSABLE);
             if(pkg!=null)intent.setPackage(pkg);

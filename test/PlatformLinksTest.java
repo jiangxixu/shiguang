@@ -23,8 +23,18 @@ public class PlatformLinksTest {
         calls.clear();
         check(PlatformLinks.open("https://xhslink.cn/o/abc",(url,pkg)->{calls.add(url);return pkg==null;}));
         check(calls.get(0).equals("https://xhslink.cn/o/abc"));
-        check(calls.get(1).startsWith("xhsdiscover://webview?link="));
-        check(calls.get(2).equals("https://xhslink.cn/o/abc"));
+        check(calls.size()==2);check(calls.get(1).equals("https://xhslink.cn/o/abc"));
+        // A resolved short link must launch the actual native note, never an in-app browser.
+        String shortUrl="http://xhslink.com/a/Abc123";
+        String resolved=XhsLinks.resolve(shortUrl,url->{if(url.contains("xhslink.com"))return "https://xhslink.cn/o/Abc123";return note;});
+        check(resolved.equals(note));
+        check(PlatformLinks.open(resolved,(url,pkg)->{check(url.equals("xhsdiscover://item/0123456789abcdef01234567?xsec_token=a%2Bb"));check(pkg.equals("com.xingin.xhs"));return true;}));
+        check(XhsLinks.resolve(shortUrl,url->"https://127.0.0.1/private").equals(shortUrl));
+        check(XhsLinks.resolve(shortUrl,url->"https://xiaohongshu.com.evil.test/explore/0123456789abcdef01234567").equals(shortUrl));
+        check(XhsLinks.resolve(shortUrl,url->"https://www.xiaohongshu.com/user/profile/0123456789abcdef01234567").equals(shortUrl));
+        int[] hops={0};check(XhsLinks.resolve(shortUrl,url->{hops[0]++;return url;}).equals(shortUrl));check(hops[0]==5);
+        check(XhsLinks.resolve(note,url->{throw new AssertionError("Resolved note should not be fetched");}).equals(note));
+        check(XhsLinks.resolve(shortUrl,url->{throw new java.io.IOException("offline");}).equals(shortUrl));
         for(String host:new String[]{"bilibili.com.evil.test","evilbilibili.com","xiaohongshu.com.evil.test","linux.do"})check(PlatformLinks.packages(host).length==0);
         for(String url:new String[]{"javascript:alert(1)","intent://x","file:///a","https://user@bilibili.com/video/a","not a URL"})
             check(!PlatformLinks.open(url,(u,pkg)->{throw new AssertionError("unsafe link was launched");}));

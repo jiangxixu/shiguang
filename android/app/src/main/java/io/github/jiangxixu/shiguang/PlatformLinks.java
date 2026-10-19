@@ -24,16 +24,13 @@ final class PlatformLinks {
             if(h==null||uri.getRawUserInfo()!=null||!("https".equalsIgnoreCase(scheme)||"http".equalsIgnoreCase(scheme)))return false;
             if(uri.getPort()==-1||uri.getPort()==443||uri.getPort()==80){
                 if(host(h.toLowerCase(Locale.ROOT),"xiaohongshu.com")){
-                    java.util.regex.Matcher note=java.util.regex.Pattern.compile("^/(?:explore|discovery/item)/([a-fA-F0-9]{24})/?$").matcher(uri.getPath());
-                    if(note.find()){
-                        String deep="xhsdiscover://item/"+note.group(1)+(uri.getRawQuery()==null?"":"?"+uri.getRawQuery());
+                    String note=XhsLinks.noteId(url.replaceFirst("(?i)^http:","https:"));
+                    if(note!=null){
+                        String deep="xhsdiscover://item/"+note+(uri.getRawQuery()==null?"":"?"+uri.getRawQuery());
                         if(opener.open(deep,"com.xingin.xhs"))return true;
                     }
                 }
                 for(String pkg:packages(h))if(opener.open(url,pkg))return true;
-                if(host(h.toLowerCase(Locale.ROOT),"xhslink.com")||host(h.toLowerCase(Locale.ROOT),"xhslink.cn")){
-                    try{if(opener.open("xhsdiscover://webview?link="+java.net.URLEncoder.encode(url,"UTF-8"),"com.xingin.xhs"))return true;}catch(java.io.UnsupportedEncodingException ignored){}
-                }
             }
             return opener.open(url,null);
         }catch(java.net.URISyntaxException e){return false;}

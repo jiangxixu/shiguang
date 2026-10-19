@@ -14,3 +14,11 @@ test('Xiaohongshu cn short links and old other-site records regain their platfor
   assert.equal(core.detect('https://xhslink.cn.evil.test/o/abc'),'other');
  }
 });
+test('known link domains correct previously wrong platform while retaining collection metadata',()=>{
+ for(const file of ['../dist/core.js','../collector/core.js']){
+  const core=require(file),url='https://xhslink.cn/o/abc?xsec_token=a%2Bb';
+  const fixed=core.normalize({url,platform:'bilibili',tags:['机器人'],notes:'保留原因',read:true,starred:true});
+  assert.equal(fixed.platform,'xiaohongshu');assert.equal(fixed.url,url);assert.deepEqual(fixed.tags,['机器人']);assert.equal(fixed.notes,'保留原因');assert.equal(fixed.read,true);assert.equal(fixed.starred,true);
+  assert.equal(core.normalize({url:'https://b23.tv/abc',platform:'xiaohongshu'}).platform,'bilibili');
+ }
+});

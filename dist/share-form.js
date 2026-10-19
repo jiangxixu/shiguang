@@ -5,6 +5,7 @@
  const report=data=>window.ShiguangQuickResult?.postMessage(JSON.stringify(data));
  window.shiguangReceiveShare=item=>{
   if(draft)return;draft=SG.normalize(item);resolveDraft();
+  if(draft){const source=document.getElementById('platform');if(source)source.textContent='来源：'+(SG.platforms[draft.platform]?.name||'其他网站');}
   if(draft)ShiguangPreview.fetch(draft).then(meta=>{if(!saving&&meta.thumbnail)draft.thumbnail=meta.thumbnail;if(!saving&&meta.title){draft.title=meta.title;document.getElementById('title').textContent=meta.title;}}).catch(()=>{});
  };
  window.ShiguangCloseCapture=()=>report({cancel:true});

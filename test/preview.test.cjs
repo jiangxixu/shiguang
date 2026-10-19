@@ -24,15 +24,16 @@ test('metadata parser accepts varied OG attribute order and rejects outbound pri
  const data=await preview('https://www.bilibili.com/video/BV123',async url=>{assert.match(url,/api.bilibili.com/);return Response.json({code:0,data:{pic:'http://i0.hdslb.com/test.jpg',title:'原视频'}});});assert.equal(data.thumbnail,'https://i0.hdslb.com/test.jpg');
 });
 test('mobile share waits for confirmation and preserves categories, optional reason and cover',async()=>{
- let raw=JSON.stringify([{url:'https://example.com/existing',title:'已有',tags:['机器人']}]);const reports=[];
- const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({signedIn:true,pending:0})},ShiguangPreview:{fetch:async()=>({})},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:()=>({})}};page.window=page;
+ let raw=JSON.stringify([{url:'https://example.com/existing',title:'已有',tags:['机器人']}]);const reports=[],elements={};
+ const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({signedIn:true,pending:0})},ShiguangPreview:{fetch:async()=>({})},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:id=>elements[id]??={}}};page.window=page;
  vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);
  page.shiguangReceiveShare({url:'https://www.bilibili.com/video/BV123',title:'视频',thumbnail:'https://i0.hdslb.com/test.jpg'});
+ assert.equal(elements.platform.textContent,'来源：哔哩哔哩');
  const response=await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});assert.deepEqual([...response.tags],['机器人']);assert.equal(JSON.parse(raw).length,1);
  await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',tags:'机器人，新分类',reason:''});
  const saved=JSON.parse(raw)[0];assert.deepEqual(saved.tags,['机器人','新分类']);assert.equal(saved.notes,'');assert.equal(saved.thumbnail,'https://i0.hdslb.com/test.jpg');assert.equal(reports[0].saved,true);assert.equal(reports[1].cloud,true);
 });
 test('mobile share reports no success when durable storage fails',async()=>{
- const reports=[],page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve()},ShiguangPreview:{fetch:async()=>({})},ShiguangQuickResult:{postMessage:text=>reports.push(text)},localStorage:{getItem:()=>null,setItem:()=>{throw Error('quota');}}};page.window=page;vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);page.shiguangReceiveShare({url:'https://example.com'});await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});
+ const reports=[],page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve()},ShiguangPreview:{fetch:async()=>({})},ShiguangQuickResult:{postMessage:text=>reports.push(text)},document:{getElementById:()=>({})},localStorage:{getItem:()=>null,setItem:()=>{throw Error('quota');}}};page.window=page;vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);page.shiguangReceiveShare({url:'https://example.com'});await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});
  await assert.rejects(page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE'}),/quota/);assert.equal(reports.length,0);
 });

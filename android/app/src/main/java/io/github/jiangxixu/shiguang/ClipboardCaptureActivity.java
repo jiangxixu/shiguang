@@ -33,12 +33,12 @@ public class ClipboardCaptureActivity extends Activity {
                 CharSequence value=clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
                 String text=value==null?"":value.toString();
                 if(expected!=null){
-                    java.util.regex.Matcher links=Pattern.compile("https?://[^\\s<>\\\"，。；）】]+").matcher(text);
+                    java.util.List<String> links=ShareLinks.candidates(text);
                     boolean matches=false;
-                    while(links.find()){String link=links.group().replaceAll("[)\\].,;!]+$","");if(FavoriteRules.contentUrl(expected,link)){text=link;matches=true;break;}}
+                    for(String link:links)if(FavoriteRules.contentUrl(expected,link)){text=link;matches=true;break;}
                     if(!matches){message("没有取得对应平台的原内容链接，未保存。不会用主页或旧剪贴板内容代替。");return;}
                 }
-                if(text.length()<=100000&&Pattern.compile("https?://[^\\s<>]+").matcher(text).find()){
+                if(!ShareLinks.candidates(text).isEmpty()){
                     if(expected!=null)FavoriteCaptureService.report(this,"原内容链接校验通过，正在打开分类窗口（尚未保存）");
                     startActivity(new Intent(this,QuickShareActivity.class).setAction(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text));finish();return;
                 }
