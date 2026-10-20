@@ -23,6 +23,9 @@ final class FavoriteRules {
     static boolean savedState(String label){return savedButton(label)||clean(label).matches("(?:已选中|已勾选|选中)")||clean(label).matches(".*[,，](?:已选中|已勾选)(?:[,，].*)?");}
     static boolean success(String label){String s=clean(label);return s.matches("(?:收藏成功|已收藏|已添加到收藏夹|成功添加到收藏夹|保存成功|已添加至稍后观看)[!！。]?")||s.matches("(?i)(?:已保存到|已保存至|已儲存至|Savedto|Addedto).{1,100}");}
     static boolean copy(String label){String s=control(label);return s.equals("复制链接")||s.equals("复制链接按钮")||s.equals("复制笔记链接")||s.equals("拷贝链接")||s.equals("複製連結")||s.equalsIgnoreCase("Copylink");}
+    // Douyin labels its copy-to-clipboard action 分享链接 on some releases.
+    // Keep this alias platform-scoped; generic Share link can open a different flow.
+    static boolean copyForPlatform(String pkg,String label){return copy(label)||(platform(pkg)==3&&control(label).equals("分享链接"));}
     static boolean systemCopy(String label){String s=control(label);return copy(label)||s.equals("复制")||s.equalsIgnoreCase("Copy");}
     static boolean share(String label){String s=control(label);return s.equals("分享")||s.equals("分享按钮")||s.equals("分享笔记")||s.equals("分享视频")||s.equals("分享回答")||s.equals("分享文章")||s.equals("共享")||s.equalsIgnoreCase("Share")||s.equalsIgnoreCase("Sharevideo");}
     static boolean roleId(String pkg,String id,String role){

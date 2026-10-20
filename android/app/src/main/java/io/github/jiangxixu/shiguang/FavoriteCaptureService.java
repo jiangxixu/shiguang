@@ -235,7 +235,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         Map<String,AccessibilityNodeInfo> matches=new LinkedHashMap<>();
         for(AccessibilityNodeInfo n:nodes(root)){
             String t=text(n.getText()),d=text(n.getContentDescription());
-            boolean copyText=FavoriteRules.copy(t)||FavoriteRules.copy(d)||(FavoriteRules.shareSheet(text(n.getPackageName()))&&(FavoriteRules.systemCopy(t)||FavoriteRules.systemCopy(d)));
+            boolean copyText=FavoriteRules.copyForPlatform(pendingPackage,t)||FavoriteRules.copyForPlatform(pendingPackage,d)||(FavoriteRules.shareSheet(text(n.getPackageName()))&&(FavoriteRules.systemCopy(t)||FavoriteRules.systemCopy(d)));
             if(!(FavoriteRules.roleId(pendingPackage,n.getViewIdResourceName(),copy?"copy":"share")||(copy?copyText:(FavoriteRules.share(t)||FavoriteRules.share(d)))))continue;
             AccessibilityNodeInfo target=n;for(int i=0;!target.isClickable()&&i<2;i++){
                 AccessibilityNodeInfo parent=target.getParent();if(parent==null)break;
@@ -267,7 +267,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         for(int i=0;i<n.getChildCount()&&i<12;i++){AccessibilityNodeInfo child=n.getChild(i);if(child==null)continue;if(copyLabelText(child,system))return true;for(int j=0;j<child.getChildCount()&&j<12;j++){AccessibilityNodeInfo grandchild=child.getChild(j);if(grandchild!=null&&copyLabelText(grandchild,system))return true;}}
         return false;
     }
-    private boolean copyLabelText(AccessibilityNodeInfo n,boolean system){String t=text(n.getText()),d=text(n.getContentDescription());return system?(FavoriteRules.systemCopy(t)||FavoriteRules.systemCopy(d)):(FavoriteRules.copy(t)||FavoriteRules.copy(d));}
+    private boolean copyLabelText(AccessibilityNodeInfo n,boolean system){String t=text(n.getText()),d=text(n.getContentDescription());return system?(FavoriteRules.systemCopy(t)||FavoriteRules.systemCopy(d)):(FavoriteRules.copyForPlatform(pendingPackage,t)||FavoriteRules.copyForPlatform(pendingPackage,d));}
     private void beginShare(){
         if(phase!=1||!enabled(this))return;
         if(root()==null){fail("无法读取原平台当前窗口，本次未保存");return;}
@@ -285,6 +285,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             if(!pendingShareRule.isEmpty())FavoriteBindings.save(FavoriteCaptureService.this,pendingPackage,"share",pendingShareRule);
             if(prompt!=null){prompt.dismiss();prompt=null;}
             String pkg=pendingPackage;long timestamp=System.currentTimeMillis();
+            state(FavoriteRules.platformName(pkg)+" · 已找到取链接入口，正在点击并校验新链接");
             boolean clicked=clickNode(copy);
             if(!clicked){fail("未能复制原内容链接，本次未保存");return;}phase=3;
             handler.postDelayed(()->{
@@ -295,7 +296,7 @@ public class FavoriteCaptureService extends AccessibilityService {
                 }catch(Exception e){offerCapture(pkg,timestamp);}
             },450);return;
         }
-        if(SystemClock.elapsedRealtime()-copyStarted>copyTimeout){fail("未找到「复制链接」，本次未保存。请在分享菜单选择拾光。");return;}
+        if(SystemClock.elapsedRealtime()-copyStarted>copyTimeout){fail("未找到「复制链接 / 分享链接」，本次未保存。请在分享菜单选择拾光。");return;}
         handler.postDelayed(this,250);
     }};
     private void manualShare(){

@@ -1,6 +1,6 @@
 {
   "name": "shiguang",
-  "version": "1.6.11",
+  "version": "1.6.12",
   "private": true,
   "scripts": {
     "start": "node server.cjs",

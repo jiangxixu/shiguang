@@ -49,6 +49,12 @@ public class FavoriteRulesTest {
         check(FavoriteRules.share("Share video, button"));
         check(FavoriteRules.roleId(youtube,"com.google.android.youtube:id/save_to_playlist","favorite"));
         check(!FavoriteRules.favoriteButton("下载视频"));check(!FavoriteRules.favoriteButton("Save image"));
+        check(FavoriteRules.copyForPlatform(douyin,"分享链接"));
+        check(FavoriteRules.copyForPlatform("com.ss.android.ugc.aweme.lite","分享链接，按钮"));
+        for(String pkg:new String[]{xhs,bili,zhihu,youtube,"android","evil.app"})check(!FavoriteRules.copyForPlatform(pkg,"分享链接"));
+        for(String pkg:FavoriteRules.PACKAGES)check(FavoriteRules.copyForPlatform(pkg,"复制链接"));
+        for(String label:new String[]{"分享","分享给","分享给好友","分享链接到微信","复制文案","保存视频"})check(!FavoriteRules.copyForPlatform(douyin,label));
+        check(!FavoriteRules.copy("分享链接"));check(!FavoriteRules.systemCopy("分享链接"));
         System.out.println("Favorite/cancel distinction and real platform-content URL validation passed.");
     }
 }
