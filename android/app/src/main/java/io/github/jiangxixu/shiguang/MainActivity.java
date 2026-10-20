@@ -70,11 +70,11 @@ public class MainActivity extends Activity {
                     String action=data.optString("action");
                     if("calibrateAutoCapture".equals(action)){
                         if(!FavoriteCaptureService.enabled(this)||!FavoriteCaptureService.active()){Toast.makeText(this,"请先开启收藏跟随并连接无障碍服务",Toast.LENGTH_LONG).show();return;}
-                        new android.app.AlertDialog.Builder(this).setTitle("适配哪个平台？").setItems(new String[]{"小红书","B站"},(d,index)->{
-                            String pkg=index==0?"com.xingin.xhs":"tv.danmaku.bili";
+                        new android.app.AlertDialog.Builder(this).setTitle("适配哪个平台？").setItems(FavoriteRules.PLATFORMS,(d,index)->{
+                            String pkg=FavoriteRules.PACKAGES[index];
                             new android.app.AlertDialog.Builder(this).setTitle("记录哪个按钮？").setMessage("随后打开该平台的内容详情页。按提示记录下一次点击；分享按钮需出现复制链接菜单才会生效。")
                                 .setPositiveButton("分享 / ⋯",(a,b)->FavoriteCaptureService.calibrate(pkg,"share"))
-                                .setNeutralButton("收藏图标",(a,b)->FavoriteCaptureService.calibrate(pkg,"favorite"))
+                                .setNeutralButton("收藏 / 保存图标",(a,b)->FavoriteCaptureService.calibrate(pkg,"favorite"))
                                 .setNegativeButton("取消",null).show();
                         }).show();return;
                     }
@@ -110,7 +110,7 @@ public class MainActivity extends Activity {
     }
     private void enableAutoCapture(){
         new android.app.AlertDialog.Builder(this).setTitle("启用收藏跟随（试用）")
-            .setMessage("仅适配小红书、B站的可识别按钮。允许拾光在这些 App 的前台页面本地比较收藏前后的按钮状态；确认新增收藏后，尝试自动打开分享菜单并点击复制链接，再弹出分类窗口。系统拦截弹窗时，显示可点击的「选择分类」提示。只有你确认保存，原链接及填写的信息才会同步。\n\n不读取密码、不上传页面树，不操作点赞或取消收藏。没有取得新原链接就不保存。不同版本可能无法识别，尚未在你的手机验证。可随时关闭。")
+            .setMessage("支持尝试适配小红书、B站、知乎、抖音（含极速版）、YouTube 的可识别按钮。YouTube 对应保存到播放列表或稍后观看。允许拾光在这些 App 的前台页面本地比较收藏前后的按钮状态；确认新增收藏后，尝试自动打开分享菜单并点击复制链接，再弹出分类窗口。系统拦截弹窗时，显示可点击的「选择分类」提示。只有你确认保存，原链接及填写的信息才会同步。\n\n不读取密码、不上传页面树，不操作点赞或取消收藏。没有取得新原链接就不保存。不同版本可能无法识别，尚未在你的手机验证。可随时关闭。")
             .setNegativeButton("暂不开启",null).setPositiveButton("同意并前往系统开启",(dialog,which)->{
                 stopService(new Intent(this,FloatingCaptureService.class));
                 getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",true).apply();

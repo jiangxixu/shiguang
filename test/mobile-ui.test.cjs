@@ -1,5 +1,19 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 
+test('every calibratable platform and supported variant is included in the accessibility event filter',()=>{
+ const root='android/app/src/main/',java=root+'java/io/github/jiangxixu/shiguang/';
+ const rules=fs.readFileSync(java+'FavoriteRules.java','utf8');
+ const xml=fs.readFileSync(root+'res/xml/favorite_accessibility.xml','utf8');
+ const allowed=new Set(xml.match(/android:packageNames="([^"]+)"/)[1].split(','));
+ const primary=[...rules.match(/PACKAGES=\{([^}]+)\}/)[1].matchAll(/"([^"]+)"/g)].map(x=>x[1]);
+ const variants=[...rules.matchAll(/pkg\.equals\("([^"]+)"\)/g)].map(x=>x[1]);
+ assert.equal(primary.length,5);
+ assert.deepEqual(allowed,new Set([...primary,...variants]));
+ const activity=fs.readFileSync(java+'MainActivity.java','utf8');
+ assert.match(activity,/setItems\(FavoriteRules.PLATFORMS/);
+ assert.match(activity,/String pkg=FavoriteRules.PACKAGES\[index\]/);
+});
+
 test('login opens immediately even when initial session lookup is still pending; slow sends show feedback',async()=>{
  const elements={},timers=[];let opened='';
  const element=id=>elements[id]??=( {value:'test@example.com',disabled:false,textContent:'',reportValidity:()=>true} );
@@ -22,9 +36,9 @@ test('native capture setup sends only the action explicitly tapped; website hide
  let html='',sent=[];const controls={};
  const actions=['enableAutoCapture','disableAutoCapture','autoCaptureDiagnostics','calibrateAutoCapture','enableFloating','disableFloating','addCaptureTile','pinCapture','captureClipboard'];
  const buttons=actions.map(action=>({dataset:{nativeAction:action}}));
- const context={items:[],storageFailed:false,window:{ShiguangNative:{postMessage:raw=>sent.push(JSON.parse(raw))}},document:{documentElement:{dataset:{appVersion:'1.6.6'}},querySelectorAll:()=>buttons},esc:x=>x,openModal:(title,body)=>html=body,$:id=>controls[id]??={},backup(){},importDialog(){}};
+ const context={items:[],storageFailed:false,window:{ShiguangNative:{postMessage:raw=>sent.push(JSON.parse(raw))}},document:{documentElement:{dataset:{appVersion:'1.6.7'}},querySelectorAll:()=>buttons},esc:x=>x,openModal:(title,body)=>html=body,$:id=>controls[id]??={},backup(){},importDialog(){}};
  vm.runInNewContext(source+';settings()',context);
- assert.match(html,/Android 1.6.6/);assert.match(html,/查看检测记录/);assert.match(html,/开启悬浮收藏球/);assert.match(html,/关闭悬浮收藏球/);assert.equal(sent.length,0);
+ assert.match(html,/Android 1.6.7/);assert.match(html,/查看检测记录/);assert.match(html,/开启悬浮收藏球/);assert.match(html,/关闭悬浮收藏球/);assert.equal(sent.length,0);
  buttons.forEach(button=>button.onclick());
  assert.deepEqual(sent,actions.map(action=>({action})));
  context.window={};vm.runInNewContext('settings()',context);assert.ok(!html.includes('data-native-action'));

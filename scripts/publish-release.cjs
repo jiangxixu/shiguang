@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.6\n\n根据1.6.4检测记录修复“页面发生滚动，本次跟随已停止”：等待收藏确认期间，滚动或收藏夹布局变化不再直接取消。确认收藏后，核对是否回到原内容窗口及本地页面锚点；未回到原内容就不自动点击分享，避免误收下一条视频。等待有固定期限，无法核对时显示手动分享引导，保留原链接和分类确认要求。锚点只短时保存在内存，不写入日志或上传。\n\n包含1.6.5的图标语义识别、B站长按/成功事件支持、“我→适配本机按钮”、分享失败时不中断的引导。小红书可记录分享/⋯，B站可记录收藏图标；分享规则验证复制链接菜单后才生效。\n\n覆盖安装，不要卸载；请在系统无障碍中将拾光收藏跟随关闭再开启。先在“我”中确认1.6.6。若B站仍无弹窗，查看新版带平台包名的检测记录，旧版0个控件记录不足以确定是哪个平台或页面。\n\n自动测试、编译和安装包验证不能替代实际手机验证。下载 shiguang-android.apk。网站：https://jiangxixu.github.io/shiguang/ 。Android 8.0及以上，固定签名。";
+ const notes="拾光 Android 1.6.7\n\n收藏跟随及适配本机按钮增加知乎、抖音（含极速版）、YouTube；同时扩展无障碍监听范围、平台独立的按钮规则和原内容链接校验。YouTube 支持尝试识别保存到播放列表/稍后观看的按钮及确认提示。每个平台的规则单独保存，B站和抖音的不同版本仅在对应平台内适配。\n\n升级：覆盖安装，不卸载；关闭再开启系统中的拾光无障碍服务。进入我→适配本机按钮，选择平台，分别记录分享和收藏/保存按钮；分享按钮出现复制链接菜单后规则才生效。完成平台收藏确认后，取得本次原链接，再进入分类窗口由你确认保存。\n\n保留1.6.6的滚动容错及原内容核对。未取得原链接不保存，支持范围不代表所有App版本都已在实际手机验证。自动测试及编译不能替代手机实测。\n\n下载 shiguang-android.apk。网站：https://jiangxixu.github.io/shiguang/ 。Android 8.0及以上，固定签名。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:false})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();

@@ -48,7 +48,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     private void state(String text){report(this,text);}
     static boolean enabled(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getBoolean("enabled",false);}
     static void pause(Context c){c.getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();if(instance!=null){instance.reset();instance.disableSelf();}}
-    @Override protected void onServiceConnected(){instance=this;state("服务已连接，等待小红书或B站的收藏操作");handler.post(sample);}
+    @Override protected void onServiceConnected(){instance=this;state("服务已连接，等待已支持平台的收藏/保存操作");handler.post(sample);}
     private void reset(){handler.removeCallbacksAndMessages(null);if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";clickedKey="";transitions.clear();scene.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;learningRole="";learningRule="";boundFavorite=null;}
     private String text(CharSequence value){return value==null?"":value.toString();}
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
@@ -267,16 +267,16 @@ public class FavoriteCaptureService extends AccessibilityService {
     static boolean calibrate(String pkg,String role){if(instance==null||!enabled(instance))return false;instance.startLearning(pkg,role);return true;}
     private void startLearning(String pkg,String role){
         reset();if(!enabled(this))return;phase=4;pendingPackage=pkg;learningRole=role;
-        String label=role.equals("share")?"分享（或 ⋯）":"收藏";
+        String label=role.equals("share")?"分享（或 ⋯）":"收藏 / 保存（YouTube：保存到播放列表）";
         state("准备记录"+label+"按钮，请先进入原App的内容详情页");
         prompt=new FavoritePrompt(this);
-        if(!prompt.show("拾光 · 适配本机按钮","先打开"+(pkg.equals("com.xingin.xhs")?"小红书笔记":"B站视频")+"详情页"+(role.equals("favorite")?"（请选择尚未收藏的内容）":"")+"，再点下方“记录下一次点击”，然后只点一次原App的"+label+"按钮。不会记录正文或账号。","记录下一次点击",()->{
+        if(!prompt.show("拾光 · 适配本机按钮","先打开"+FavoriteRules.platformName(pkg)+"内容"+"详情页"+(role.equals("favorite")?"（请选择尚未收藏的内容）":"")+"，再点下方“记录下一次点击”，然后只点一次原App的"+label+"按钮。不会记录正文或账号。","记录下一次点击",()->{
             prompt.dismiss();prompt=null;learningArmed=true;state("请点一次原App的"+label+"按钮");Toast.makeText(this,"请点原App的"+label+"按钮",Toast.LENGTH_LONG).show();
         },()->{reset();state("按钮适配已取消");})){fail("无法显示按钮适配提示，请检查无障碍服务连接");return;}
         handler.postDelayed(()->fail("按钮适配已超时，请重新开始"),60000);
     }
     private void learnClick(AccessibilityEvent event,String pkg){
-        if(!learningArmed||(!pkg.equals(pendingPackage)&&!(pendingPackage.equals("tv.danmaku.bili")&&FavoriteRules.supported(pkg)&&!pkg.equals("com.xingin.xhs"))))return;
+        if(!learningArmed||!FavoriteRules.samePlatform(pendingPackage,pkg))return;
         if(event.getEventType()!=AccessibilityEvent.TYPE_VIEW_CLICKED&&event.getEventType()!=AccessibilityEvent.TYPE_VIEW_LONG_CLICKED)return;
         AccessibilityNodeInfo target=event.getSource();if(target==null){state("系统未提供点击控件，请再点一次按钮");return;}
         target=control(target);AccessibilityNodeInfo page=target;
