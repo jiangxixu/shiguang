@@ -14,6 +14,13 @@ public class FavoriteRulesTest {
         check(!FavoriteRules.favoriteButton("她说收藏,按钮"));check(!FavoriteRules.share("分享给好友"));
         check(FavoriteRules.savedState("收藏,已选中"));check(FavoriteRules.savedState("已选中"));
         check(!FavoriteRules.savedState("收藏,未选中"));check(!FavoriteRules.savedState("未选中"));
+        check(FavoriteRules.roleId("tv.danmaku.bili","tv.danmaku.bili:id/frame_favor","favorite"));
+        check(FavoriteRules.roleId("tv.danmaku.bili","tv.danmaku.bili:id/iv_share","share"));
+        check(FavoriteRules.roleId("com.xingin.xhs","com.xingin.xhs:id/copy_link","copy"));
+        for(String id:new String[]{"tv.danmaku.bili:id/favorite_list","tv.danmaku.bili:id/my_collection","tv.danmaku.bili:id/share_count","evil.app:id/share","tv.danmaku.bili:id/more"})check(!FavoriteRules.roleId("tv.danmaku.bili",id,"share"));
+        check(!FavoriteRules.roleId("tv.danmaku.bili","tv.danmaku.bili:id/favorite_list","favorite"));
+        check(FavoriteRules.confirmedSuccess("收藏成功"));check(FavoriteRules.confirmedSuccess("已添加到收藏夹"));
+        check(!FavoriteRules.confirmedSuccess("已收藏"));check(!FavoriteRules.confirmedSuccess("取消收藏成功"));
         String xhs="com.xingin.xhs",bili="tv.danmaku.bili";
         check(FavoriteRules.contentUrl(xhs,"https://xhslink.cn/o/Abc123"));
         check(FavoriteRules.contentUrl(xhs,"https://www.xiaohongshu.com/explore/0123456789abcdef01234567?xsec_token=a%2Bb"));

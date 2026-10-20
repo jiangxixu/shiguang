@@ -20,11 +20,11 @@ test('brand resolves to a real packaged page; removed floating collector is not 
 test('native capture setup sends only the action explicitly tapped; website hides Android setup',()=>{
  const source=fs.readFileSync('dist/app.js','utf8').split('\n').find(line=>line.startsWith('function settings()'));
  let html='',sent=[];const controls={};
- const actions=['enableAutoCapture','disableAutoCapture','autoCaptureDiagnostics','enableFloating','disableFloating','addCaptureTile','pinCapture','captureClipboard'];
+ const actions=['enableAutoCapture','disableAutoCapture','autoCaptureDiagnostics','calibrateAutoCapture','enableFloating','disableFloating','addCaptureTile','pinCapture','captureClipboard'];
  const buttons=actions.map(action=>({dataset:{nativeAction:action}}));
- const context={items:[],storageFailed:false,window:{ShiguangNative:{postMessage:raw=>sent.push(JSON.parse(raw))}},document:{documentElement:{dataset:{appVersion:'1.6.4'}},querySelectorAll:()=>buttons},esc:x=>x,openModal:(title,body)=>html=body,$:id=>controls[id]??={},backup(){},importDialog(){}};
+ const context={items:[],storageFailed:false,window:{ShiguangNative:{postMessage:raw=>sent.push(JSON.parse(raw))}},document:{documentElement:{dataset:{appVersion:'1.6.5'}},querySelectorAll:()=>buttons},esc:x=>x,openModal:(title,body)=>html=body,$:id=>controls[id]??={},backup(){},importDialog(){}};
  vm.runInNewContext(source+';settings()',context);
- assert.match(html,/Android 1.6.4/);assert.match(html,/查看检测记录/);assert.match(html,/开启悬浮收藏球/);assert.match(html,/关闭悬浮收藏球/);assert.equal(sent.length,0);
+ assert.match(html,/Android 1.6.5/);assert.match(html,/查看检测记录/);assert.match(html,/开启悬浮收藏球/);assert.match(html,/关闭悬浮收藏球/);assert.equal(sent.length,0);
  buttons.forEach(button=>button.onclick());
  assert.deepEqual(sent,actions.map(action=>({action})));
  context.window={};vm.runInNewContext('settings()',context);assert.ok(!html.includes('data-native-action'));

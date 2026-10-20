@@ -68,6 +68,16 @@ public class MainActivity extends Activity {
                         JSONObject response=new JSONObject();response.put("clipboard",text.substring(0,Math.min(10000,text.length())));reply.postMessage(response.toString());return;
                     }
                     String action=data.optString("action");
+                    if("calibrateAutoCapture".equals(action)){
+                        if(!FavoriteCaptureService.enabled(this)||!FavoriteCaptureService.active()){Toast.makeText(this,"请先开启收藏跟随并连接无障碍服务",Toast.LENGTH_LONG).show();return;}
+                        new android.app.AlertDialog.Builder(this).setTitle("适配哪个平台？").setItems(new String[]{"小红书","B站"},(d,index)->{
+                            String pkg=index==0?"com.xingin.xhs":"tv.danmaku.bili";
+                            new android.app.AlertDialog.Builder(this).setTitle("记录哪个按钮？").setMessage("随后打开该平台的内容详情页。按提示记录下一次点击；分享按钮需出现复制链接菜单才会生效。")
+                                .setPositiveButton("分享 / ⋯",(a,b)->FavoriteCaptureService.calibrate(pkg,"share"))
+                                .setNeutralButton("收藏图标",(a,b)->FavoriteCaptureService.calibrate(pkg,"favorite"))
+                                .setNegativeButton("取消",null).show();
+                        }).show();return;
+                    }
                     if("autoCaptureDiagnostics".equals(action)){
                         String details="拾光 "+BuildConfig.VERSION_NAME+"\n应用开关："+(FavoriteCaptureService.enabled(this)?"已开启":"已关闭")+"\n无障碍连接："+(FavoriteCaptureService.active()?"已连接":"未连接")+"\n\n"+FavoriteCaptureService.history(this);
                         new android.app.AlertDialog.Builder(this).setTitle("收藏跟随 · 本机检测记录").setMessage(details).setPositiveButton("知道了",null).setNeutralButton("复制记录",(d,w)->{((android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(android.content.ClipData.newPlainText("拾光检测记录",details));}).show();return;
