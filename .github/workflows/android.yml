@@ -79,7 +79,7 @@ jobs:
           umask 077
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/shiguang.p12"
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/shiguang.p12"
-          gradle -p android --no-daemon assembleRelease
+          gradle -p android --no-daemon testDebugUnitTest assembleRelease
           mkdir -p release
           cp android/app/build/outputs/apk/release/app-release.apk release/shiguang-android.apk
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose release/shiguang-android.apk

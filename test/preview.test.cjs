@@ -105,3 +105,14 @@ test('native title is delivered immediately while missing cover is fetched, and 
  assert.equal(meta.title,'实际原文标题');assert.equal(meta.thumbnail,'https://cdn.example.com/original.jpg');
  page.fetch=async()=>{throw Error('offline')};const fallback=await page.ShiguangPreview.fetch(item);assert.equal(fallback.title,'实际原文标题');
 });
+
+
+test('YouTube short-link hostname is still a placeholder after canonicalization and existing saves can be repaired',async()=>{
+ let calls=0;const page={window:null,SG,URL,setTimeout,clearTimeout,ShiguangPreviewNative:{postMessage(raw){calls++;const data=JSON.parse(raw);queueMicrotask(()=>this.onmessage({data:JSON.stringify({id:data.id,title:'Actual original video title'})}));}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);
+ const item=SG.normalize({url:'https://youtu.be/7-io63CTbeM',title:'youtu.be',tags:['test'],notes:'keep this reason'});
+ assert.match(item.url,/youtube.com/);assert.equal(page.ShiguangPreview.needsTitle(item),true);
+ const meta=await page.ShiguangPreview.fetch(item);assert.equal(calls,1);assert.equal(page.ShiguangPreview.apply(item,meta),true);assert.equal(item.title,'Actual original video title');assert.match(item.thumbnail,/7-io63CTbeM/);
+ let raw=JSON.stringify([{...item,title:'youtu.be'}]);const storage={getItem:()=>raw,setItem:(k,v)=>raw=v};Capture.save(storage,[item]);assert.equal(JSON.parse(raw)[0].title,item.title);assert.equal(JSON.parse(raw)[0].notes,'keep this reason');
+ assert.equal(SG.needsTitle({url:item.url,title:'How youtu.be redirects work'}),false);assert.equal(SG.needsTitle({url:item.url,title:'How to use www.youtube.com'}),false);assert.equal(SG.needsTitle({url:item.url,title:'youtu.be.evil.example'}),false);
+});

@@ -9,5 +9,6 @@ final class FavoriteScene {
     void start(int window,String anchor,long now){this.window=window;this.anchor=anchor==null?"":anchor;deadline=now+17000;}
     boolean tracked(){return !anchor.isEmpty();}
     boolean matches(int window,String anchor){return tracked()&&this.window==window&&this.anchor.equals(anchor);}
+    boolean contains(int window,java.util.Collection<String> visibleText){return tracked()&&this.window==window&&visibleText.contains(anchor);}
     boolean expired(long now){return now>=deadline;}
 }

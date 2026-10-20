@@ -13,8 +13,7 @@
   const byUrl=new Map(normalized.map(item=>[SG.canonical(item.url),item]));
   for(const item of result.items){const fresh=byUrl.get(SG.canonical(item.url));if(!fresh)continue;
    if(!item.thumbnail)item.thumbnail=SG.safeImage(fresh.thumbnail)||SG.thumbnailFor(item);
-   const title=String(item.title||'').trim(),host=new URL(item.url).hostname;
-   if((!title||title===item.url||title===host||title===host.replace(/^www\./,'')||/^(?:抖音|YouTube|知乎|小红书)$/i.test(title))&&fresh.title&&fresh.title!==fresh.url&&fresh.title!==host)item.title=fresh.title;
+   if(SG.needsTitle(item)&&!SG.needsTitle(fresh))item.title=fresh.title;
   }
   // Acknowledgement is returned only after durable storage succeeds.
   storage.setItem(KEY,JSON.stringify(result.items));

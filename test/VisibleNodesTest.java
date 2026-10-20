@@ -13,6 +13,11 @@ public class VisibleNodesTest {
         List<Node> found=VisibleNodes.collect(root,tree);
         check(found.contains(title)&&found.contains(share)&&found.contains(save));check(!found.contains(root)&&!found.contains(passwordChild));
         check(VisibleNodes.collect(null,tree).isEmpty());
+        Node icon=new Node(true,false),label=new Node(true,false),chip=new Node(true,false,new Node(false,false,new Node(false,false,icon,label)));
+        List<Node> chipNodes=VisibleNodes.collect(chip,tree);
+        check(VisibleNodes.uniqueTarget(chipNodes,n->n==icon||n==label?chip:null)==chip);
+        check(VisibleNodes.uniqueTarget(chipNodes,n->n==icon||n==label?n:null)==null);
+        check(VisibleNodes.uniqueTarget(chipNodes,n->null)==null);
         Node cycle=new Node(false,false);cycle.children.add(cycle);check(VisibleNodes.collect(cycle,tree).isEmpty());
         Node many=new Node(false,false);for(int i=0;i<5000;i++)many.children.add(new Node(true,false));check(VisibleNodes.collect(many,tree).size()==800);
         System.out.println("Visible title, share and save controls survive hidden wrappers; sensitive subtrees and traversal are bounded.");

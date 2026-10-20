@@ -15,6 +15,7 @@ final class ContentPreviewUrls {
     static boolean redirect(String original,String next){String f=family(original);return !f.isEmpty()&&f.equals(family(next));}
     static String title(String value){
         String s=value==null?"":value.trim();
+        if(s.matches("在抖音记录美好生活[0-9]{0,8}(?:\\s*[-—]\\s*抖音)?"))return "";
         if(s.isEmpty()||s.matches("(?i)(?:知乎|抖音(?:\\s*[-—]\\s*记录美好生活)?|YouTube|登录.*|安全验证.*|验证.*|Justamoment.*|AccessDenied.*|Sign.?in.*)"))return "";
         return s.substring(0,Math.min(500,s.length()));
     }

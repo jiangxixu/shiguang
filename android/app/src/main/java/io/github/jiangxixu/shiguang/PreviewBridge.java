@@ -121,7 +121,7 @@ final class PreviewBridge {
             long remaining=deadline-android.os.SystemClock.elapsedRealtime();if(remaining<=0)return new JSONObject();
             HttpsURLConnection c=(HttpsURLConnection)new URL(current).openConnection();
             c.setInstanceFollowRedirects(false);c.setConnectTimeout((int)Math.min(3000,remaining));c.setReadTimeout((int)Math.min(3000,remaining));
-            c.setRequestProperty("User-Agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+            c.setRequestProperty("User-Agent","Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36");
             c.setRequestProperty("Accept","text/html,application/xhtml+xml");
             c.setRequestProperty("Referer","https://www.xiaohongshu.com/");
             if(session){String cookies=android.webkit.CookieManager.getInstance().getCookie(current);if(cookies!=null&&!cookies.isEmpty())c.setRequestProperty("Cookie",cookies);}
@@ -136,21 +136,10 @@ final class PreviewBridge {
                     html=new String(out.toByteArray(),StandardCharsets.UTF_8);
                 }
                 java.util.Map<String,String> meta=PublicMetadata.parse(html);String title=meta.get("title"),image=meta.get("thumbnail");boolean matchedNote=false;
-                // Prefer this exact note's own title and first image over the site's generic logo.
-                try{
-                    String state=PublicMetadata.stateJson(html);
-                    JSONObject note=new JSONObject(state).getJSONObject("note").getJSONObject("noteDetailMap").getJSONObject(XhsLinks.noteId(current)).getJSONObject("note");
-                    matchedNote=true;
-                    String t=note.optString("title","").trim();if(t.isEmpty())t=note.optString("desc","").split("\n",2)[0].trim();if(!t.isEmpty())title=t;
-                    org.json.JSONArray images=note.optJSONArray("imageList");
-                    if(images!=null&&images.length()>0){
-                        JSONObject first=images.optJSONObject(0);if(first!=null){
-                            String candidate=first.optString("urlDefault","");if(candidate.isEmpty())candidate=first.optString("urlPre","");if(candidate.isEmpty())candidate=first.optString("url","");
-                            org.json.JSONArray info=first.optJSONArray("infoList");if(candidate.isEmpty()&&info!=null&&info.length()>0&&info.optJSONObject(0)!=null)candidate=info.optJSONObject(0).optString("url","");
-                            if(!candidate.isEmpty())image=candidate;
-                        }
-                    }
-                }catch(Exception ignored){}
+                JSONObject exact=XhsNoteMetadata.parse(html,XhsLinks.noteId(current));
+                matchedNote=exact.optBoolean("matched");
+                if(!exact.optString("title").isEmpty())title=exact.optString("title");
+                if(!exact.optString("thumbnail").isEmpty())image=exact.optString("thumbnail");
                 // Login/error pages must not replace a saved note title or masquerade as its cover.
                 if(title==null||title.trim().isEmpty())return new JSONObject();
                 if(!matchedNote&&title.matches("(?i)(?:小红书登录|登录小红书|安全验证|访问频繁|页面不存在|内容不存在|Sign.?in).*"))return new JSONObject().put("requiresLogin",true);
