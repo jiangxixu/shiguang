@@ -56,6 +56,15 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(phase==0){
             if(!pkg.equals(observedPackage)){transitions.clear();observedPackage=pkg;handler.removeCallbacks(sample);handler.post(sample);}
             int type=event.getEventType();
+            AccessibilityNodeInfo current=platformRoot(pkg);
+            if(current!=null){
+                boolean success=FavoriteRules.success(text(event.getContentDescription()))&&!FavoriteRules.clean(text(event.getContentDescription())).equals("已收藏");
+                for(CharSequence value:event.getText())success|=FavoriteRules.success(text(value))&&!FavoriteRules.clean(text(value)).equals("已收藏");
+                // A state refresh during initial loading is not a user favorite. A generic
+                // click (even with no label), or an explicit success event, must precede it.
+                if(type==AccessibilityEvent.TYPE_VIEW_CLICKED){AccessibilityNodeInfo clicked=favoriteSource(event.getSource());transitions.interact(scope(pkg,current.getWindowId()),clicked==null?"":nodeKey(clicked),now);}
+                else if(success)transitions.interact(scope(pkg,current.getWindowId()),"",now);
+            }
             if(type!=AccessibilityEvent.TYPE_VIEW_CLICKED&&now-lastObserved>150){lastObserved=now;observe(pkg);}
         }
         if(event.getEventType()==AccessibilityEvent.TYPE_VIEW_CLICKED){
