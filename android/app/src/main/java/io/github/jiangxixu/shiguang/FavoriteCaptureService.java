@@ -10,7 +10,7 @@ import java.util.*;
 /** Optional experimental workflow: favorite -> share -> copy link -> classification. */
 public class FavoriteCaptureService extends AccessibilityService {
     private final Handler handler=new Handler(Looper.getMainLooper());
-    private String pendingPackage="",pendingShareRule="";
+    private String pendingPackage="",pendingShareRule="",pendingTitle="";
     private long lastAttempt,copyStarted;
     private String clickedKey="";
     private final FavoriteWait wait=new FavoriteWait();
@@ -22,7 +22,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     private long suppressUntil;
     private long lastObserved,lastDiagnostic,lastClick;
     private String lastClickPackage="",lastDiagnosticText="",learningRole="",learningRule="";
-    private boolean learningArmed,scrollMessageSent;
+    private boolean learningArmed,scrollMessageSent,zhihuMoreOpened,zhihuShareOpened;
     private long copyTimeout=3000;
     private AccessibilityNodeInfo boundFavorite;
     private final Runnable sample=new Runnable(){public void run(){
@@ -49,7 +49,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     static boolean enabled(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getBoolean("enabled",false);}
     static void pause(Context c){c.getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();if(instance!=null){instance.reset();instance.disableSelf();}}
     @Override protected void onServiceConnected(){instance=this;state("服务已连接，等待已支持平台的收藏/保存操作");handler.post(sample);}
-    private void reset(){handler.removeCallbacksAndMessages(null);if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";pendingShareRule="";clickedKey="";transitions.clear();scene.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;learningRole="";learningRule="";boundFavorite=null;}
+    private void reset(){handler.removeCallbacksAndMessages(null);if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;learningRole="";learningRule="";boundFavorite=null;}
     private String text(CharSequence value){return value==null?"":value.toString();}
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(!enabled(this)){reset();return;}
@@ -160,7 +160,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     private void startFavorite(String pkg,String key,boolean confirmed){
         long now=SystemClock.elapsedRealtime();if(phase!=0||now-lastAttempt<4000)return;
         reset();lastAttempt=now;pendingPackage=pkg;clickedKey=key;phase=1;wait.start(now);
-        AccessibilityNodeInfo page=platformRoot(pkg);scene.start(page==null?-1:page.getWindowId(),sceneText(page),now);
+        AccessibilityNodeInfo page=platformRoot(pkg);pendingTitle=zhihuTitle(page);scene.start(page==null?-1:page.getWindowId(),sceneText(page),now);
         if(confirmed)wait.confirm(now);
         state(confirmed?"已识别未收藏→已收藏，准备取得原链接":"已识别收藏按钮，等待平台确认收藏成功");
         handler.postDelayed(confirm,250);
@@ -199,6 +199,40 @@ public class FavoriteCaptureService extends AccessibilityService {
         while(!queue.isEmpty()&&result.size()<800){AccessibilityNodeInfo n=queue.remove();result.add(n);for(int i=0;i<n.getChildCount()&&queue.size()<800;i++){AccessibilityNodeInfo child=n.getChild(i);if(child!=null&&child.isVisibleToUser()&&!child.isPassword()&&!child.isEditable())queue.add(child);}}
         return result;
     }
+    private String zhihuTitle(AccessibilityNodeInfo page){
+        if(page==null||!"com.zhihu.android".equals(text(page.getPackageName())))return "";
+        android.graphics.Rect screen=new android.graphics.Rect();page.getBoundsInScreen(screen);if(screen.isEmpty())return "";
+        String best="";int bestScore=-1;float bestTop=Float.MAX_VALUE;
+        for(AccessibilityNodeInfo n:nodes(page)){
+            android.graphics.Rect box=new android.graphics.Rect();n.getBoundsInScreen(box);
+            String value=text(n.getText());if(value.isEmpty())value=text(n.getContentDescription());
+            int score=ZhihuPageRules.titleScore(value,n.getViewIdResourceName(),Build.VERSION.SDK_INT>=28&&n.isHeading(),(double)(box.top-screen.top)/screen.height(),(double)box.width()/screen.width());
+            if(score>bestScore||(score>=0&&score==bestScore&&box.top<bestTop)){bestScore=score;best=ZhihuPageRules.title(value);bestTop=box.top;}
+        }
+        return best;
+    }
+    private AccessibilityNodeInfo zhihuToolbar(Collection<AccessibilityNodeInfo> candidates,AccessibilityNodeInfo page){
+        if(!"com.zhihu.android".equals(pendingPackage)||page==null||pendingTitle.isEmpty())return null;
+        android.graphics.Rect screen=new android.graphics.Rect();page.getBoundsInScreen(screen);if(screen.isEmpty())return null;
+        AccessibilityNodeInfo best=null;int score=-1;boolean tie=false;
+        for(AccessibilityNodeInfo node:candidates){
+            android.graphics.Rect box=new android.graphics.Rect();node.getBoundsInScreen(box);
+            int value=ZhihuPageRules.toolbarScore((box.exactCenterX()-screen.left)/screen.width(),(box.exactCenterY()-screen.top)/screen.height());
+            if(value>score){score=value;best=node;tie=false;}else if(value>=0&&value==score&&!node.equals(best)){
+                android.graphics.Rect previous=new android.graphics.Rect();best.getBoundsInScreen(previous);
+                if(previous.contains(box)){best=node;}else if(!box.contains(previous))tie=true;
+            }
+        }
+        return tie?null:best;
+    }
+    private AccessibilityNodeInfo zhihuMore(AccessibilityNodeInfo page){
+        Map<String,AccessibilityNodeInfo> matches=new LinkedHashMap<>();
+        for(AccessibilityNodeInfo n:nodes(page))if(ZhihuPageRules.more(text(n.getText()),n.getViewIdResourceName())||ZhihuPageRules.more(text(n.getContentDescription()),n.getViewIdResourceName())){
+            AccessibilityNodeInfo target=control(n);android.graphics.Rect r=new android.graphics.Rect();target.getBoundsInScreen(r);
+            if(target.isVisibleToUser()&&target.isEnabled())matches.put(r.toString(),target);
+        }
+        return zhihuToolbar(matches.values(),page);
+    }
     private String sceneText(AccessibilityNodeInfo root){
         // Prefer an exposed title/heading; otherwise keep one substantial article text
         // locally in memory. It is never persisted in diagnostics or sent to a server.
@@ -236,7 +270,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         for(AccessibilityNodeInfo n:nodes(root)){
             String t=text(n.getText()),d=text(n.getContentDescription());
             boolean copyText=FavoriteRules.copyForPlatform(pendingPackage,t)||FavoriteRules.copyForPlatform(pendingPackage,d)||(FavoriteRules.shareSheet(text(n.getPackageName()))&&(FavoriteRules.systemCopy(t)||FavoriteRules.systemCopy(d)));
-            if(!(FavoriteRules.roleId(pendingPackage,n.getViewIdResourceName(),copy?"copy":"share")||(copy?copyText:(FavoriteRules.share(t)||FavoriteRules.share(d)))))continue;
+            if(!(FavoriteRules.roleId(pendingPackage,n.getViewIdResourceName(),copy?"copy":"share")||(!copy&&pendingPackage.equals("com.zhihu.android")&&ZhihuPageRules.shareId(n.getViewIdResourceName()))||(copy?copyText:(FavoriteRules.share(t)||FavoriteRules.share(d)))))continue;
             AccessibilityNodeInfo target=n;for(int i=0;!target.isClickable()&&i<2;i++){
                 AccessibilityNodeInfo parent=target.getParent();if(parent==null)break;
                 android.graphics.Rect bounds=new android.graphics.Rect();parent.getBoundsInScreen(bounds);android.util.DisplayMetrics metrics=getResources().getDisplayMetrics();
@@ -249,7 +283,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             }
         }
         // Ambiguous controls are deliberately not clicked.
-        return matches.size()==1?matches.values().iterator().next():null;
+        return matches.size()==1?matches.values().iterator().next():(!copy?zhihuToolbar(matches.values(),root):null);
     }
     private boolean clickNode(AccessibilityNodeInfo node){
         if(node==null||!node.isVisibleToUser()||!node.isEnabled()||node.isEditable()||node.isPassword())return false;
@@ -270,11 +304,14 @@ public class FavoriteCaptureService extends AccessibilityService {
     private boolean copyLabelText(AccessibilityNodeInfo n,boolean system){String t=text(n.getText()),d=text(n.getContentDescription());return system?(FavoriteRules.systemCopy(t)||FavoriteRules.systemCopy(d)):(FavoriteRules.copyForPlatform(pendingPackage,t)||FavoriteRules.copyForPlatform(pendingPackage,d));}
     private void beginShare(){
         if(phase!=1||!enabled(this))return;
-        if(root()==null){fail("无法读取原平台当前窗口，本次未保存");return;}
-        AccessibilityNodeInfo share=button(false);lastAttempt=SystemClock.elapsedRealtime();
-        if(share==null){manualShare();return;}
-        phase=2;copyTimeout=5000;copyStarted=SystemClock.elapsedRealtime();
-        state("已识别收藏状态，正在从原平台取得链接");
+        AccessibilityNodeInfo page=root();if(page==null){fail("无法读取原平台当前窗口，本次未保存");return;}
+        String title=zhihuTitle(page);if(!title.isEmpty()){pendingTitle=title;state("已读取知乎原页面标题，将随原链接保存");}
+        AccessibilityNodeInfo share=button(false);
+        if(share==null&&pendingPackage.equals("com.zhihu.android")){share=zhihuMore(page);zhihuMoreOpened=share!=null;}
+        lastAttempt=SystemClock.elapsedRealtime();
+        if(share==null){if(pendingPackage.equals("com.zhihu.android"))state("知乎自动取链接："+(pendingTitle.isEmpty()?"未读到明确标题":"已读到原页面标题")+"；未找到可唯一定位的分享/更多控件");manualShare();return;}
+        phase=2;copyTimeout=8000;copyStarted=SystemClock.elapsedRealtime();
+        state(zhihuMoreOpened?"正在自动打开知乎更多菜单并取得原链接":"已识别收藏状态，正在从原平台取得链接");
         if(!clickNode(share)){fail("无法打开分享菜单，本次未保存");return;}
         handler.postDelayed(pollCopy,300);
     }
@@ -295,6 +332,10 @@ public class FavoriteCaptureService extends AccessibilityService {
                     launchCapture(pkg,timestamp);
                 }catch(Exception e){offerCapture(pkg,timestamp);}
             },450);return;
+        }
+        if(zhihuMoreOpened&&!zhihuShareOpened){
+            AccessibilityNodeInfo share=button(false);
+            if(share!=null){zhihuShareOpened=true;state("已找到知乎菜单中的分享入口，正在自动打开");if(!clickNode(share)){fail("无法打开知乎分享菜单，本次未保存");return;}handler.postDelayed(this,350);return;}
         }
         if(SystemClock.elapsedRealtime()-copyStarted>copyTimeout){fail("未找到「复制链接 / 分享链接」，本次未保存。请在分享菜单选择拾光。");return;}
         handler.postDelayed(this,250);
@@ -339,7 +380,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     }
     private void launchCapture(String pkg,long timestamp){
         state("已复制原链接，正在打开分类窗口");
-        startActivity(new Intent(this,ClipboardCaptureActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("expectedPackage",pkg).putExtra("notBefore",timestamp));
+        startActivity(new Intent(this,ClipboardCaptureActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("expectedPackage",pkg).putExtra("notBefore",timestamp).putExtra("capturedTitle",pendingTitle));
         handler.postDelayed(()->{if(getPrefs(this).getLong("launchAck",0)!=timestamp)offerCapture(pkg,timestamp);else reset();},2000);
     }
     private void offerCapture(String pkg,long timestamp){

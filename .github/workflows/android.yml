@@ -52,6 +52,10 @@ jobs:
         run: |
           javac -d "$RUNNER_TEMP/binding-test" android/app/src/main/java/io/github/jiangxixu/shiguang/FavoriteBindingMatch.java test/FavoriteBindingMatchTest.java
           java -cp "$RUNNER_TEMP/binding-test" io.github.jiangxixu.shiguang.FavoriteBindingMatchTest
+      - name: Check Zhihu title and share-menu hints
+        run: |
+          javac -d "$RUNNER_TEMP/zhihu-test" android/app/src/main/java/io/github/jiangxixu/shiguang/ZhihuPageRules.java test/ZhihuPageRulesTest.java
+          java -cp "$RUNNER_TEMP/zhihu-test" io.github.jiangxixu.shiguang.ZhihuPageRulesTest
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.13'

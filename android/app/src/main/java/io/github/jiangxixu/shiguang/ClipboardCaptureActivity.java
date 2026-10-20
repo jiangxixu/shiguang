@@ -38,6 +38,7 @@ public class ClipboardCaptureActivity extends Activity {
                     if(links.size()==1)sharedTitle=ShareLinks.sharedTitle(text);
                     boolean matches=false;
                     for(String link:links)if(FavoriteRules.contentUrl(expected,link)){text=link;matches=true;break;}
+                    if(matches&&sharedTitle.isEmpty()&&"com.zhihu.android".equals(expected))sharedTitle=ZhihuPageRules.title(getIntent().getStringExtra("capturedTitle"));
                     if(!matches){message("没有取得对应平台的原内容链接，未保存。不会用主页或旧剪贴板内容代替。");return;}
                 }
                 if(!ShareLinks.candidates(text).isEmpty()){

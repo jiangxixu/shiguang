@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.12\n\n根据1.6.11手机截图修复抖音分享菜单取链接：将抖音（含极速版）的“分享链接”识别为取链接入口，同时支持原有“复制链接”。此别名仅对抖音生效，不会当成其他平台的普通分享按钮；查找按钮、验证分享适配、控件点击范围检查使用同一规则。\n\n新增检测记录“已找到取链接入口”；点击后仍校验新剪贴板时间戳及原平台真实内容链接，再弹出分类窗口。保留原有本机按钮适配记录，无需重新适配。\n\n覆盖安装shiguang-android.apk；更新后重连一次拾光无障碍服务。已通过自动化测试及签名构建，未在实体手机验证。";
+ const notes="拾光 Android 1.6.13\n\n知乎收藏流程修复：读取原内容顶部可识别的问题/文章标题，在校验新复制链接后带入分类保存窗口，减少只保存域名的问题。\n\n扩展知乎分享资源ID识别；多个分享控件出现时，结合已识别的原内容标题和工具栏位置选择明确的分享入口。找不到直接分享时，尝试可识别的更多菜单，再自动进入分享并复制链接。不会仅根据屏幕坐标点击无标签图标。\n\n覆盖安装，无需卸载或重新适配。更新后重连拾光无障碍服务。分类和原因仍由你确认后保存。已通过自动化测试和签名构建；无法取得设备页面树，尚未在你的知乎版本上实测，无可识别入口时仍需手动分享。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:false})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();
