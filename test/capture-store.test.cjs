@@ -15,3 +15,11 @@ test('quick capture never overwrites malformed storage or acknowledges failed wr
 test('invalid share URLs are rejected without a partial write',()=>{
  const s=storage();assert.throws(()=>capture.save(s,[{url:'https://example.com'},{url:'javascript:alert(1)'}]));assert.equal(s.raw,null);
 });
+
+
+test('recapturing Douyin enriches missing title and cover while preserving user fields',()=>{
+ const s=storage();const url='https://v.douyin.com/abc/';capture.save(s,[{url,title:'v.douyin.com',tags:['Learning'],notes:'Keep',read:true}]);
+ capture.save(s,[{url,title:'Real caption',thumbnail:'https://cdn.example.com/video.jpg',tags:['Other'],notes:''}]);
+ const saved=JSON.parse(s.raw)[0];assert.equal(saved.title,'Real caption');assert.equal(saved.thumbnail,'https://cdn.example.com/video.jpg');assert.deepEqual(saved.tags,['Learning']);assert.equal(saved.notes,'Keep');assert.equal(saved.read,true);
+ capture.save(s,[{url,title:'Replacement',thumbnail:'https://cdn.example.com/other.jpg'}]);assert.equal(JSON.parse(s.raw)[0].title,'Real caption');assert.equal(JSON.parse(s.raw)[0].thumbnail,'https://cdn.example.com/video.jpg');
+});

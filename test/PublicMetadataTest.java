@@ -10,6 +10,10 @@ public class PublicMetadataTest {
         check(PublicMetadata.stateJson("window.__INITIAL_STATE__={\"unfinished\":{")==null);
         check(PublicMetadata.stateJson("<script>alert('test')</script>")==null);
         check(PublicMetadata.stateJson("window.__INITIAL_STATE__={\"title\":\"a\"}; doSomething()").equals("{\"title\":\"a\"}"));
+        check(PublicMetadata.renderData("<script type='application/json' id='RENDER_DATA'>%7B%22desc%22%3A%22test%2Bcover%22%7D</script>").equals("{\"desc\":\"test+cover\"}"));
+        check(PublicMetadata.renderData("<script id='OTHER'>{}</script>")==null);
+        check(PublicMetadata.renderData("<script id='RENDER_DATA'>%ZZ</script>")==null);
+        check(PublicMetadata.renderData("<script id='RENDER_DATA'>{\"desc\":\"a+b\"}</script>").equals("{\"desc\":\"a+b\"}"));
         System.out.println("Public OG metadata, entities and inert bounded initial-state extraction passed.");
     }
 }

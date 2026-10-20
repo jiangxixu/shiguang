@@ -47,6 +47,15 @@ final class ShareLinks {
                 if(title.length()>=2&&title.length()<=500&&!title.matches("(?:知乎|分享自知乎|打开知乎.*|来自知乎.*)"))return title;
             }
         }
+        if(links.size()==1&&(platformName(links.get(0)).equals("抖音")||platformName(links.get(0)).equals("YouTube"))){
+            Matcher link=LINK.matcher(text);String prefix=link.find()?text.substring(0,link.start()).trim():"";
+            // Douyin's copied prose includes a share counter and trailing invitation.
+            prefix=prefix.replaceFirst("^\\d+(?:\\.\\d+)?\\s+", "").replaceFirst("\\s*复制(?:此|这|本)条.*$", "").trim();
+            for(String line:prefix.split("[\\r\\n]+")){
+                String title=line.trim().replaceFirst("\\s*[-—]\\s*(?:抖音|YouTube)\\s*$", "").trim();
+                if(title.length()>=2&&title.length()<=500&&!title.matches("(?i)(?:抖音|YouTube|分享.*|复制.*|打开.*|快来.*|在抖音.*)"))return title;
+            }
+        }
         return "";
     }
 }

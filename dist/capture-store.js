@@ -9,6 +9,13 @@
   const raw=storage.getItem(KEY),existing=raw===null?[]:JSON.parse(raw);
   if(!Array.isArray(existing)||existing.some(x=>!SG.normalize(x)))throw Error('现有知识库格式异常，请先备份修复');
   const result=SG.merge(existing,normalized);
+  // Re-sharing may supply metadata that was unavailable on the first capture.
+  const byUrl=new Map(normalized.map(item=>[SG.canonical(item.url),item]));
+  for(const item of result.items){const fresh=byUrl.get(SG.canonical(item.url));if(!fresh)continue;
+   if(!item.thumbnail)item.thumbnail=SG.safeImage(fresh.thumbnail)||SG.thumbnailFor(item);
+   const title=String(item.title||'').trim(),host=new URL(item.url).hostname;
+   if((!title||title===item.url||title===host||title===host.replace(/^www\./,'')||/^(?:抖音|YouTube|知乎|小红书)$/i.test(title))&&fresh.title&&fresh.title!==fresh.url&&fresh.title!==host)item.title=fresh.title;
+  }
   // Acknowledgement is returned only after durable storage succeeds.
   storage.setItem(KEY,JSON.stringify(result.items));
   return {added:result.added,duplicates:result.duplicates,total:result.items.length};

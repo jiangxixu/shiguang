@@ -23,6 +23,10 @@ public class ShareLinksTest {
         check(ShareLinks.sharedTitle("为什么要学习机器人？ - 知乎 https://www.zhihu.com/question/123/answer/456").equals("为什么要学习机器人？"));
         check(ShareLinks.sharedTitle("问题标题\nhttps://zhihu.link/abc").equals("问题标题"));
         check(ShareLinks.sharedTitle("https://zhihu.link/abc").isEmpty());
+        check(ShareLinks.sharedTitle("3.14 学会机器人控制 #机器人 https://v.douyin.com/abc/ 复制此链接，打开抖音").equals("学会机器人控制 #机器人"));
+        check(ShareLinks.sharedTitle("复制此链接，打开抖音 https://v.douyin.com/abc/").isEmpty());
+        check(ShareLinks.sharedTitle("Learning robotics - YouTube\nhttps://youtu.be/AbC123_-xyZ").equals("Learning robotics"));
+        check(ShareLinks.sharedTitle("https://youtu.be/AbC123_-xyZ").isEmpty());
         System.out.println("Copied share prose, platform priority, URL choice, Unicode, access-token and domain-spoof regression tests passed.");
     }
 }

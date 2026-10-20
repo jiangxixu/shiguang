@@ -34,7 +34,7 @@ test('Xiaohongshu cn short links use phone metadata while signed out and repair 
 
 test('mobile save waits for in-flight note metadata and persists title and cover together',async()=>{
  let raw='[]',finish;const elements={},reports=[];
- const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({signedIn:true,pending:0})},ShiguangPreview:{fetch:()=>new Promise(resolve=>finish=resolve)},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:id=>elements[id]??={}}};page.window=page;
+ const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({signedIn:true,pending:0})},ShiguangPreview:{needsTitle:item=>!item.title||item.title===new URL(item.url).hostname,fetch:()=>new Promise(resolve=>finish=resolve)},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:id=>elements[id]??={}}};page.window=page;
  vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);
  page.shiguangReceiveShare({url:'https://xhslink.cn/o/ABC123',title:'xhslink.cn'});
  await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});
@@ -62,7 +62,7 @@ test('metadata parser accepts varied OG attribute order and rejects outbound pri
 });
 test('mobile share waits for confirmation and preserves categories, optional reason and cover',async()=>{
  let raw=JSON.stringify([{url:'https://example.com/existing',title:'已有',tags:['机器人']}]);const reports=[],elements={};
- const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({signedIn:true,pending:0})},ShiguangPreview:{fetch:async()=>({})},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:id=>elements[id]??={}}};page.window=page;
+ const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({signedIn:true,pending:0})},ShiguangPreview:{needsTitle:item=>!item.title||item.title===new URL(item.url).hostname,fetch:async()=>({})},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:id=>elements[id]??={}}};page.window=page;
  vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);
  page.shiguangReceiveShare({url:'https://www.bilibili.com/video/BV123',title:'视频',thumbnail:'https://i0.hdslb.com/test.jpg'});
  assert.equal(elements.platform.textContent,'来源：哔哩哔哩');
@@ -71,6 +71,25 @@ test('mobile share waits for confirmation and preserves categories, optional rea
  const saved=JSON.parse(raw)[0];assert.deepEqual(saved.tags,['机器人','新分类']);assert.equal(saved.notes,'');assert.equal(saved.thumbnail,'https://i0.hdslb.com/test.jpg');assert.equal(reports[0].saved,true);assert.equal(reports[1].cloud,true);
 });
 test('mobile share reports no success when durable storage fails',async()=>{
- const reports=[],page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve()},ShiguangPreview:{fetch:async()=>({})},ShiguangQuickResult:{postMessage:text=>reports.push(text)},document:{getElementById:()=>({})},localStorage:{getItem:()=>null,setItem:()=>{throw Error('quota');}}};page.window=page;vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);page.shiguangReceiveShare({url:'https://example.com'});await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});
+ const reports=[],page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve()},ShiguangPreview:{needsTitle:item=>!item.title||item.title===new URL(item.url).hostname,fetch:async()=>({})},ShiguangQuickResult:{postMessage:text=>reports.push(text)},document:{getElementById:()=>({})},localStorage:{getItem:()=>null,setItem:()=>{throw Error('quota');}}};page.window=page;vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);page.shiguangReceiveShare({url:'https://example.com'});await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});
  await assert.rejects(page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE'}),/quota/);assert.equal(reports.length,0);
+});
+
+
+test('YouTube title-only native response and cloud failure retain the original video cover',async()=>{
+ const page={window:null,SG,URL,setTimeout,clearTimeout,ShiguangPreviewNative:{postMessage(raw){const data=JSON.parse(raw);queueMicrotask(()=>this.onmessage({data:JSON.stringify({id:data.id,title:'Video title'})}));}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);
+ const item=SG.normalize({url:'https://www.youtube.com/shorts/AbC123_-xyZ'});
+ let meta=await page.ShiguangPreview.fetch(item);assert.equal(meta.title,'Video title');assert.equal(meta.thumbnail,'https://i.ytimg.com/vi/AbC123_-xyZ/hqdefault.jpg');
+ delete page.ShiguangPreviewNative;page.ShiguangCloud={ready:Promise.resolve(),client:{auth:{getSession:async()=>{throw Error('offline')}}}};
+ meta=await page.ShiguangPreview.fetch(item);assert.equal(meta.thumbnail,'https://i.ytimg.com/vi/AbC123_-xyZ/hqdefault.jpg');
+});
+
+test('mobile YouTube save persists its cover before lookup and preserves a meaningful shared title',async()=>{
+ let raw='[]';const elements={};
+ const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({})},ShiguangPreview:{needsTitle:()=>false,fetch:async()=>({title:'YouTube'})},ShiguangQuickResult:{postMessage(){}},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:id=>elements[id]??={}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);
+ page.shiguangReceiveShare({url:'https://youtu.be/AbC123_-xyZ',title:'Actual shared title'});
+ await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',tags:'Videos'});
+ const saved=JSON.parse(raw)[0];assert.equal(saved.title,'Actual shared title');assert.equal(saved.thumbnail,'https://i.ytimg.com/vi/AbC123_-xyZ/hqdefault.jpg');
 });

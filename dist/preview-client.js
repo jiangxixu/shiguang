@@ -1,7 +1,7 @@
 (function(root){
  'use strict';
  const domains=['bilibili.com','b23.tv','youtube.com','youtu.be','linux.do','zhihu.com','zhihu.link','xiaohongshu.com','xhslink.com','xhslink.cn','douyin.com','iesdouyin.com','github.com'];
- function needsTitle(item){try{const title=String(item.title||'').trim(),u=new URL(item.url);return !title||title===item.url||title===u.hostname||title===u.hostname.replace(/^www\./,'')||title==='小红书';}catch{return false;}}
+ function needsTitle(item){try{const title=String(item.title||'').trim(),u=new URL(item.url);return !title||title===item.url||title===u.hostname||title===u.hostname.replace(/^www\./,'')||/^(?:小红书|抖音|YouTube|知乎)$/i.test(title);}catch{return false;}}
  function apply(item,meta){let changed=false;if(!item.thumbnail&&SG.safeImage(meta.thumbnail)){item.thumbnail=SG.safeImage(meta.thumbnail);changed=true;}if(needsTitle(item)&&meta.title&&!needsTitle({...item,title:meta.title})){item.title=String(meta.title).slice(0,500);changed=true;}return changed;}
  function supported(url){try{const u=new URL(url);return u.protocol==='https:'&&domains.some(d=>u.hostname===d||u.hostname.endsWith('.'+d));}catch{return false;}}
  let sequence=0;const requests=new Map();
@@ -16,12 +16,12 @@
  async function fetchPreview(item){
   const direct=SG.thumbnailFor(item);if(direct&&!needsTitle(item))return {thumbnail:direct};
   if(root.ShiguangPreviewNative&&/^https:\/\/(?:[^/]+\.)?(?:bilibili\.com|b23\.tv|xiaohongshu\.com|xhslink\.com|xhslink\.cn|zhihu\.com|zhihu\.link|douyin\.com|iesdouyin\.com|youtube\.com|youtu\.be)\//i.test(item.url)){
-   const native=await phonePreview(item.url);if(native.thumbnail||native.title||native.requiresLogin)return native;
+   const native=await phonePreview(item.url);if(native.thumbnail||native.title||native.requiresLogin)return {...native,thumbnail:native.thumbnail||direct};
   }
   const cloud=root.ShiguangCloud;if(!cloud||!supported(item.url))return direct?{thumbnail:direct}:{};
-  await cloud.ready;const {data}=await cloud.client.auth.getSession();if(!data.session)return direct?{thumbnail:direct}:{};
+  try{await cloud.ready;const {data}=await cloud.client.auth.getSession();if(!data.session)return direct?{thumbnail:direct}:{};
   const response=await fetch(root.ShiguangCloudConfig.url+'/functions/v1/link-preview',{method:'POST',headers:{'Content-Type':'application/json',apikey:root.ShiguangCloudConfig.key,Authorization:'Bearer '+data.session.access_token},body:JSON.stringify({url:item.url}),signal:AbortSignal.timeout(10000)});
-  if(!response.ok)return direct?{thumbnail:direct}:{};const result=await response.json();return {thumbnail:SG.safeImage(result.thumbnail)||direct,title:String(result.title||'').slice(0,500)};
+  if(!response.ok)return direct?{thumbnail:direct}:{};const result=await response.json();return {thumbnail:SG.safeImage(result.thumbnail)||direct,title:String(result.title||'').slice(0,500)};}catch{return direct?{thumbnail:direct}:{};}
  }
  root.ShiguangPreview={fetch:fetchPreview,supported,needsTitle,apply};
 })(window);

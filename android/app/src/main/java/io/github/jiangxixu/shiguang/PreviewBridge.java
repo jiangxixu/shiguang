@@ -70,6 +70,22 @@ final class PreviewBridge {
                 String title,image;
                 if(family.equals("youtube")){JSONObject data=new JSONObject(body);title=data.optString("title","");image=data.optString("thumbnail_url","");}
                 else{java.util.Map<String,String> meta=PublicMetadata.parse(body);title=meta.get("title");image=meta.get("thumbnail");}
+                if(family.equals("douyin")){
+                    // Read only the exact video's embedded data; recommended videos must not supply metadata.
+                    String data=PublicMetadata.renderData(body),id=douyinId(current);
+                    if(data!=null&&!id.isEmpty())try{
+                        JSONObject video=findDouyin(new JSONObject(data),id,0,new int[]{0});
+                        if(video!=null){
+                            String desc=video.optString("desc","").trim();if(!desc.isEmpty())title=desc;
+                            JSONObject media=video.optJSONObject("video");if(media!=null){
+                                for(String key:new String[]{"origin_cover","cover","dynamic_cover"}){
+                                    JSONObject cover=media.optJSONObject(key);org.json.JSONArray urls=cover==null?null:cover.optJSONArray("url_list");
+                                    if(urls!=null&&urls.length()>0&&!urls.optString(0).isEmpty()){image=urls.optString(0);break;}
+                                }
+                            }
+                        }
+                    }catch(Exception ignored){}
+                }
                 title=ContentPreviewUrls.title(title);if(title.isEmpty())return new JSONObject();
                 JSONObject result=new JSONObject().put("title",title);
                 if(image!=null&&!image.isEmpty()){image=new URL(new URL(current),image).toString().replaceFirst("(?i)^http:","https:");URL u=new URL(image);if("https".equals(u.getProtocol())&&u.getUserInfo()==null&&(u.getPort()==-1||u.getPort()==443))result.put("thumbnail",image);}
@@ -77,6 +93,25 @@ final class PreviewBridge {
             }finally{c.disconnect();}
         }
         return new JSONObject();
+    }
+    private static String douyinId(String value){
+        Matcher m=Pattern.compile("/(?:video|note|slides|share/video)/(\\d+)(?:/|$|[?])|[?&]modal_id=(\\d+)(?:&|$)").matcher(value);
+        return m.find()?(m.group(1)!=null?m.group(1):m.group(2)):"";
+    }
+    private static JSONObject findDouyin(Object value,String id,int depth,int[] count){
+        if(depth>30||++count[0]>10000)return null;
+        if(value instanceof JSONObject){
+            JSONObject object=(JSONObject)value;
+            if(id.equals(object.optString("aweme_id"))||id.equals(object.optString("awemeId")))return object;
+            java.util.Iterator<String> keys=object.keys();while(keys.hasNext()){
+                JSONObject found=findDouyin(object.opt(keys.next()),id,depth+1,count);if(found!=null)return found;
+            }
+        }else if(value instanceof org.json.JSONArray){
+            org.json.JSONArray array=(org.json.JSONArray)value;for(int i=0;i<array.length();i++){
+                JSONObject found=findDouyin(array.opt(i),id,depth+1,count);if(found!=null)return found;
+            }
+        }
+        return null;
     }
     private static JSONObject xhs(String value,boolean session) throws Exception {
         long deadline=android.os.SystemClock.elapsedRealtime()+10000;String current=value;

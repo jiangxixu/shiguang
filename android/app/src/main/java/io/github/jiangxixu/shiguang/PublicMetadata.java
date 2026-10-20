@@ -26,6 +26,16 @@ final class PublicMetadata {
         String image=values.get("og:image:secure_url");if(image==null)image=values.get("og:image");if(image==null)image=values.get("twitter:image");
         values.put("thumbnail",image==null?"":image.trim());return values;
     }
+    static String renderData(String html){
+        if(html==null||html.length()>2000000)return null;
+        Matcher scripts=Pattern.compile("<script\\b([^>]{0,8192})>([\\s\\S]*?)</script\\s*>",Pattern.CASE_INSENSITIVE).matcher(html);
+        Pattern id=Pattern.compile("\\bid\\s*=\\s*([\"'])RENDER_DATA\\1",Pattern.CASE_INSENSITIVE);
+        while(scripts.find())if(id.matcher(scripts.group(1)).find()){
+            String data=scripts.group(2).trim();
+            try{return data.startsWith("{")?data:java.net.URLDecoder.decode(data,"UTF-8");}catch(Exception ignored){return null;}
+        }
+        return null;
+    }
     static String stateJson(String html){
         Matcher m=Pattern.compile("window\\.__INITIAL_STATE__\\s*=\\s*\\{").matcher(html);if(!m.find())return null;
         int start=m.end()-1,depth=0;boolean quoted=false,escaped=false;StringBuilder out=new StringBuilder();
