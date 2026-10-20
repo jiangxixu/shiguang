@@ -93,3 +93,15 @@ test('mobile YouTube save persists its cover before lookup and preserves a meani
  await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',tags:'Videos'});
  const saved=JSON.parse(raw)[0];assert.equal(saved.title,'Actual shared title');assert.equal(saved.thumbnail,'https://i.ytimg.com/vi/AbC123_-xyZ/hqdefault.jpg');
 });
+
+
+test('native title is delivered immediately while missing cover is fetched, and survives cloud errors',async()=>{
+ let reply,partial;
+ const page={window:null,SG,URL,setTimeout,clearTimeout,AbortSignal,ShiguangCloudConfig:{url:'https://example.com',key:'test'},ShiguangCloud:{ready:Promise.resolve(),client:{auth:{getSession:async()=>({data:{session:{access_token:'test'}}})}}},fetch:()=>new Promise(resolve=>reply=resolve),ShiguangPreviewNative:{postMessage(raw){const data=JSON.parse(raw);queueMicrotask(()=>this.onmessage({data:JSON.stringify({id:data.id,title:'实际原文标题'})}));}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);
+ const item=SG.normalize({url:'https://v.douyin.com/abc/'}),pending=page.ShiguangPreview.fetch(item,meta=>partial=meta);
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(partial.title,'实际原文标题');assert.equal(typeof reply,'function');
+ reply(Response.json({thumbnail:'https://cdn.example.com/original.jpg'}));const meta=await pending;
+ assert.equal(meta.title,'实际原文标题');assert.equal(meta.thumbnail,'https://cdn.example.com/original.jpg');
+ page.fetch=async()=>{throw Error('offline')};const fallback=await page.ShiguangPreview.fetch(item);assert.equal(fallback.title,'实际原文标题');
+});

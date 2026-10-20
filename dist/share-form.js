@@ -6,7 +6,8 @@
  window.shiguangReceiveShare=item=>{
   if(draft)return;draft=SG.normalize(item);if(draft&&!draft.thumbnail)draft.thumbnail=SG.thumbnailFor(draft);resolveDraft();
   if(draft){const source=document.getElementById('platform');if(source)source.textContent='来源：'+(SG.platforms[draft.platform]?.name||'其他网站');}
-  if(draft)metadata=Promise.race([ShiguangPreview.fetch(draft),new Promise(resolve=>setTimeout(()=>resolve({}),12500))]).then(meta=>{if(persisted)return;if(meta.thumbnail)draft.thumbnail=SG.safeImage(meta.thumbnail);if(meta.title&&ShiguangPreview.needsTitle(draft)){draft.title=String(meta.title).slice(0,500);document.getElementById('title').textContent=draft.title;}if(meta.requiresLogin)document.getElementById('status').textContent='小红书要求网页登录。可先保存原链接，再到拾光「我 → 登录小红书补全信息」，登录后补全封面。';}).catch(()=>{});
+  function applyMetadata(meta){if(persisted)return;if(meta.thumbnail)draft.thumbnail=SG.safeImage(meta.thumbnail);if(meta.title&&ShiguangPreview.needsTitle(draft)){draft.title=String(meta.title).slice(0,500);document.getElementById('title').textContent=draft.title;}if(meta.requiresLogin)document.getElementById('status').textContent='小红书要求网页登录。可先保存原链接，再到拾光「我 → 登录小红书补全信息」，登录后补全封面。';}
+  if(draft)metadata=Promise.race([ShiguangPreview.fetch(draft,applyMetadata),new Promise(resolve=>setTimeout(()=>resolve({}),12500))]).then(applyMetadata).catch(()=>{});
  };
  window.ShiguangCloseCapture=()=>report({cancel:true});
  window.ShiguangCaptureTransport={async sendMessage(message){

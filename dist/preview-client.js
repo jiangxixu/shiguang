@@ -13,15 +13,16 @@
    try{root.ShiguangPreviewNative.postMessage(JSON.stringify({id,url}));}catch{requests.delete(id);clearTimeout(timer);resolve({});}
   });
  }
- async function fetchPreview(item){
+ async function fetchPreview(item,onProgress){
   const direct=SG.thumbnailFor(item);if(direct&&!needsTitle(item))return {thumbnail:direct};
+  let partial=direct?{thumbnail:direct}:{};
   if(root.ShiguangPreviewNative&&/^https:\/\/(?:[^/]+\.)?(?:bilibili\.com|b23\.tv|xiaohongshu\.com|xhslink\.com|xhslink\.cn|zhihu\.com|zhihu\.link|douyin\.com|iesdouyin\.com|youtube\.com|youtu\.be)\//i.test(item.url)){
-   const native=await phonePreview(item.url);if(native.thumbnail||native.title||native.requiresLogin)return {...native,thumbnail:native.thumbnail||direct};
+   const native=await phonePreview(item.url);partial={...native,thumbnail:native.thumbnail||direct};try{onProgress?.(partial);}catch{}if(native.requiresLogin||(partial.thumbnail&&(!needsTitle(item)||native.title)))return partial;
   }
-  const cloud=root.ShiguangCloud;if(!cloud||!supported(item.url))return direct?{thumbnail:direct}:{};
-  try{await cloud.ready;const {data}=await cloud.client.auth.getSession();if(!data.session)return direct?{thumbnail:direct}:{};
+  const cloud=root.ShiguangCloud;if(!cloud||!supported(item.url))return partial;
+  try{await cloud.ready;const {data}=await cloud.client.auth.getSession();if(!data.session)return partial;
   const response=await fetch(root.ShiguangCloudConfig.url+'/functions/v1/link-preview',{method:'POST',headers:{'Content-Type':'application/json',apikey:root.ShiguangCloudConfig.key,Authorization:'Bearer '+data.session.access_token},body:JSON.stringify({url:item.url}),signal:AbortSignal.timeout(10000)});
-  if(!response.ok)return direct?{thumbnail:direct}:{};const result=await response.json();return {thumbnail:SG.safeImage(result.thumbnail)||direct,title:String(result.title||'').slice(0,500)};}catch{return direct?{thumbnail:direct}:{};}
+  if(!response.ok)return partial;const result=await response.json();return {...partial,thumbnail:partial.thumbnail||SG.safeImage(result.thumbnail),title:partial.title||String(result.title||'').slice(0,500)};}catch{return partial;}
  }
  root.ShiguangPreview={fetch:fetchPreview,supported,needsTitle,apply};
 })(window);

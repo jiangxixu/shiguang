@@ -15,6 +15,13 @@ final class ZhihuPageRules {
         if(top<=0.25&&width>=0.55&&(s.endsWith("？")||s.endsWith("?")))return 60;
         return -1;
     }
+    static boolean authorAction(String label){return label!=null&&label.replaceAll("[+＋\\s]","").matches("关注|已关注|互相关注");}
+    static int articleTitleScore(String value,double top,double bottom,double width,double authorTop){
+        String text=title(value);
+        if(text.isEmpty()||text.length()>120||top<0.04||top>0.25||width<0.40||authorTop<=0||authorTop>0.45||bottom>authorTop)return -1;
+        if(text.matches(".*(?:赞同|评论|阅读|关注|回答数|回答·|邀请回答|写回答).*"))return -1;
+        return 50;
+    }
     static boolean shareId(String id){return id!=null&&id.matches("com\\.zhihu\\.android:id/(?:(?:answer|article|question|toolbar|menu|action|btn|iv|ic|image|button)_)*(?:share|sharing)(?:_(?:button|btn|icon|view|layout|container))?");}
     static boolean more(String label,String id){
         String s=label==null?"":label.replaceAll("\\s+","").replaceAll("[,，]按钮","");

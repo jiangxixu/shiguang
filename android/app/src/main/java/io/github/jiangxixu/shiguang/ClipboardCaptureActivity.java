@@ -34,12 +34,9 @@ public class ClipboardCaptureActivity extends Activity {
                 String text=value==null?"":value.toString();
                 String sharedTitle="";
                 if(expected!=null){
-                    java.util.List<String> links=ShareLinks.candidates(text);
-                    if(links.size()==1)sharedTitle=ShareLinks.sharedTitle(text);
-                    boolean matches=false;
-                    for(String link:links)if(FavoriteRules.contentUrl(expected,link)){text=link;matches=true;break;}
-                    if(matches&&sharedTitle.isEmpty()&&"com.zhihu.android".equals(expected))sharedTitle=ZhihuPageRules.title(getIntent().getStringExtra("capturedTitle"));
-                    if(!matches){message("没有取得对应平台的原内容链接，未保存。不会用主页或旧剪贴板内容代替。");return;}
+                    CapturedLink captured=CapturedLink.parse(expected,text,clipboard.getPrimaryClipDescription().getTimestamp(),getIntent().getLongExtra("notBefore",0),getIntent().getStringExtra("capturedTitle"));
+                    if(captured==null){message("没有取得对应平台唯一的原内容新链接，未保存。请回到原内容重新复制链接。");return;}
+                    text=captured.url;sharedTitle=captured.title;
                 }
                 if(!ShareLinks.candidates(text).isEmpty()){
                     if(expected!=null)FavoriteCaptureService.report(this,"原内容链接校验通过，正在打开分类窗口（尚未保存）");

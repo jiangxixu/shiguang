@@ -12,7 +12,7 @@ final class CapturedLink {
         }
         if(selected==null)return null;
         String title=ShareLinks.sharedTitle(text);
-        if(title.isEmpty()&&"com.zhihu.android".equals(pkg))title=ZhihuPageRules.title(pageTitle);
+        if(FavoriteRules.supported(pkg)&&!PageTitles.clean(pageTitle).isEmpty())title=PageTitles.clean(pageTitle);
         if(title.isEmpty())try{title=new java.net.URI(selected).getHost();}catch(Exception ignored){}
         return new CapturedLink(selected,title==null?"":title);
     }

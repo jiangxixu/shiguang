@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.14\n\n收藏后直接显示可填写的分类表单：取链接后使用有焦点的可见无障碍窗口，校验新剪贴板时间戳及对应平台原链接，再显示分类和原因。同一表单复用原有账户、本机收藏库及同步流程，支持标题和封面补全。读取受系统限制时提供手动打开入口。\n\n抖音收藏继续自动取分享链接；YouTube增加存入/加入播放列表及已保存/Saved确认识别，只有正在等待本次保存时才接受简短成功提示。取消收藏不触发，未取得有效原链接不保存。\n\n修正“系统未自动打开窗口”的误导提示：旧逻辑只是未收到启动回执，新版直接显示表单优先，Activity仅作备用。覆盖安装并重连无障碍服务，无需重新适配。已通过自动化测试及签名构建，未在实体手机验证。";
+ const notes="拾光 Android 1.6.15\n\n修复多个平台的无障碍遍历：继续查找隐藏布局容器内实际可见的收藏、分享和标题控件。仍以本次收藏/保存成功为触发条件，自动取得真实原链接后显示分类表单，不使用旧剪贴板或主页代替。\n\n改善原标题和封面：支持知乎作者栏上方不带问号的文章标题，并保留其他平台明确标题控件中的内容；手机取得标题后继续补取缺失封面，封面查询超时也保留已经取得的标题。分类和收藏原因仍可留空。\n\n自动取链接失败时，检测记录新增有限的按钮结构诊断，不记录正文及标题文字，用于定位不同 App 版本的未匹配控件。覆盖安装并重连无障碍服务，已有按钮适配保留。已通过自动化测试及签名构建，尚未在用户实体手机上验证所有平台。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:false})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();

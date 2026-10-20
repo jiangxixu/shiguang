@@ -19,6 +19,11 @@ public class ZhihuPageRulesTest {
         check(!ZhihuPageRules.more("","com.zhihu.android:id/follow"));
         check(ZhihuPageRules.toolbarScore(.94,.22)>ZhihuPageRules.toolbarScore(.94,.95));
         check(ZhihuPageRules.toolbarScore(.2,.22)<0);check(ZhihuPageRules.toolbarScore(.9,.60)<0);
+        check(ZhihuPageRules.authorAction("+ 关注"));check(!ZhihuPageRules.authorAction("邀请回答"));
+        check(ZhihuPageRules.articleTitleScore("AI Agent 的 Skill 系统设计",.12,.16,.51,.18)>0);
+        check(ZhihuPageRules.articleTitleScore("阿里巴巴淘宝技术团队",.18,.22,.60,.18)<0);
+        check(ZhihuPageRules.articleTitleScore("本文系统阐述了相关的设计理念",.26,.32,.9,.18)<0);
+        check(ZhihuPageRules.articleTitleScore("AI Agent 的 Skill 系统设计",.12,.16,.51,-1)<0);
         System.out.println("Zhihu title selection, semantic menu entry and toolbar disambiguation passed.");
     }
 }
