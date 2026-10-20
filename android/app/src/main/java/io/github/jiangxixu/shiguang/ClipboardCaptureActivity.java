@@ -32,15 +32,17 @@ public class ClipboardCaptureActivity extends Activity {
                 }
                 CharSequence value=clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
                 String text=value==null?"":value.toString();
+                String sharedTitle="";
                 if(expected!=null){
                     java.util.List<String> links=ShareLinks.candidates(text);
+                    if(links.size()==1)sharedTitle=ShareLinks.sharedTitle(text);
                     boolean matches=false;
                     for(String link:links)if(FavoriteRules.contentUrl(expected,link)){text=link;matches=true;break;}
                     if(!matches){message("没有取得对应平台的原内容链接，未保存。不会用主页或旧剪贴板内容代替。");return;}
                 }
                 if(!ShareLinks.candidates(text).isEmpty()){
                     if(expected!=null)FavoriteCaptureService.report(this,"原内容链接校验通过，正在打开分类窗口（尚未保存）");
-                    startActivity(new Intent(this,QuickShareActivity.class).setAction(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text));finish();return;
+                    startActivity(new Intent(this,QuickShareActivity.class).setAction(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text).putExtra(Intent.EXTRA_SUBJECT,sharedTitle));finish();return;
                 }
             }
             message("没有读到网页链接。请先在原 App 选择「复制链接」，再点拾光收藏。下一步可选择分类、填写原因。");

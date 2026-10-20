@@ -6,6 +6,29 @@ test('Android fetches public Bilibili metadata on the phone without requiring a 
  vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);
  const result=await page.ShiguangPreview.fetch({url:'https://www.bilibili.com/video/BV123'});assert.equal(result.thumbnail,'https://i0.hdslb.com/test.jpg');assert.equal(result.title,'视频');
 });
+
+test('Xiaohongshu cn short links use phone metadata while signed out and repair only missing metadata',async()=>{
+ let called='';const page={window:null,SG,URL,setTimeout,clearTimeout,ShiguangPreviewNative:{postMessage(raw){const data=JSON.parse(raw);called=data.url;queueMicrotask(()=>this.onmessage({data:JSON.stringify({id:data.id,thumbnail:'https://sns-webpic-qc.xhscdn.com/note.jpg',title:'建议研一开始准备小论文'})}));}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);
+ const item={url:'https://xhslink.cn/o/ABC123',title:'xhslink.cn',tags:['提升方向'],notes:'我的原因'};
+ assert.equal(page.ShiguangPreview.supported(item.url),true);
+ const meta=await page.ShiguangPreview.fetch(item);assert.equal(called,item.url);
+ assert.equal(page.ShiguangPreview.apply(item,meta),true);assert.equal(item.title,'建议研一开始准备小论文');assert.equal(item.thumbnail,meta.thumbnail);assert.deepEqual(item.tags,['提升方向']);assert.equal(item.notes,'我的原因');
+ item.title='我自己修改的标题';assert.equal(page.ShiguangPreview.apply(item,{title:'另一个标题',thumbnail:'https://example.com/other.jpg'}),false);assert.equal(item.title,'我自己修改的标题');
+ const titleOnly={url:item.url,title:'xhslink.cn',thumbnail:meta.thumbnail};assert.equal(page.ShiguangPreview.apply(titleOnly,{title:meta.title}),true);assert.equal(titleOnly.title,meta.title);
+});
+
+test('mobile save waits for in-flight note metadata and persists title and cover together',async()=>{
+ let raw='[]',finish;const elements={},reports=[];
+ const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({signedIn:true,pending:0})},ShiguangPreview:{fetch:()=>new Promise(resolve=>finish=resolve)},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:id=>elements[id]??={}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);
+ page.shiguangReceiveShare({url:'https://xhslink.cn/o/ABC123',title:'xhslink.cn'});
+ await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});
+ const saving=page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',tags:'提升方向',reason:'准备论文'});
+ await Promise.resolve();assert.equal(JSON.parse(raw).length,0);assert.equal(reports.length,0);
+ finish({title:'笔记真实标题',thumbnail:'https://sns-webpic-qc.xhscdn.com/note.jpg'});await saving;
+ const saved=JSON.parse(raw)[0];assert.equal(saved.title,'笔记真实标题');assert.equal(saved.thumbnail,'https://sns-webpic-qc.xhscdn.com/note.jpg');assert.deepEqual(saved.tags,['提升方向']);assert.equal(saved.notes,'准备论文');
+});
 test('thumbnail survives normalize, backup and cloud merge; unsafe images rejected',()=>{
  const input={url:'https://www.bilibili.com/video/BV123',thumbnail:'https://i0.hdslb.com/bfs/archive/test.jpg'};
  assert.equal(SG.normalize(input).thumbnail,input.thumbnail);

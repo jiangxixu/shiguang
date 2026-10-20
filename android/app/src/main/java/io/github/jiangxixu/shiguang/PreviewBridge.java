@@ -14,7 +14,7 @@ import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Fetch public video metadata over the phone's connection, without account cookies. */
+/** Phone metadata fetch; XHS web cookies are used only after explicit local authorization. */
 final class PreviewBridge {
     private static boolean allowed(URL u) {
         String host=u.getHost().toLowerCase(java.util.Locale.ROOT);
@@ -31,8 +31,9 @@ final class PreviewBridge {
         HttpsURLConnection c=(HttpsURLConnection)url.openConnection();c.setInstanceFollowRedirects(false);c.setConnectTimeout(4000);c.setReadTimeout(4000);
         c.setRequestProperty("User-Agent","Mozilla/5.0");c.setRequestProperty("Referer","https://www.bilibili.com/");return c;
     }
-    static JSONObject fetch(String value) {
+    static JSONObject fetch(String value,boolean xhsSession) {
         try{
+            if(XhsLinks.allowed(value))return xhs(value,xhsSession);
             if(value.length()>2000)return new JSONObject();URL url=new URL(value);
             for(int i=0;i<5;i++){
                 if(!allowed(url))return new JSONObject();
@@ -48,12 +49,65 @@ final class PreviewBridge {
         }catch(Exception ignored){}
         return new JSONObject();
     }
+    private static JSONObject xhs(String value,boolean session) throws Exception {
+        long deadline=android.os.SystemClock.elapsedRealtime()+10000;String current=value;
+        for(int hop=0;hop<5;hop++){
+            if(!XhsLinks.allowed(current))return new JSONObject();
+            if(!XhsLinks.shortLink(current)&&XhsLinks.noteId(current)==null)return new JSONObject().put("requiresLogin",true);
+            long remaining=deadline-android.os.SystemClock.elapsedRealtime();if(remaining<=0)return new JSONObject();
+            HttpsURLConnection c=(HttpsURLConnection)new URL(current).openConnection();
+            c.setInstanceFollowRedirects(false);c.setConnectTimeout((int)Math.min(3000,remaining));c.setReadTimeout((int)Math.min(3000,remaining));
+            c.setRequestProperty("User-Agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+            c.setRequestProperty("Accept","text/html,application/xhtml+xml");
+            c.setRequestProperty("Referer","https://www.xiaohongshu.com/");
+            if(session){String cookies=android.webkit.CookieManager.getInstance().getCookie(current);if(cookies!=null&&!cookies.isEmpty())c.setRequestProperty("Cookie",cookies);}
+            try{
+                int status=c.getResponseCode();
+                if(status>=300&&status<400){String next=c.getHeaderField("Location");if(next==null)return new JSONObject();current=new URL(new URL(current),next).toString().replaceFirst("(?i)^http:","https:");continue;}
+                if(status!=200||XhsLinks.noteId(current)==null)return new JSONObject();
+                String html;
+                try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
+                    byte[] buffer=new byte[8192];int n;
+                    while((n=in.read(buffer))!=-1){if(out.size()+n>3000000||android.os.SystemClock.elapsedRealtime()>=deadline)return new JSONObject();out.write(buffer,0,n);}
+                    html=new String(out.toByteArray(),StandardCharsets.UTF_8);
+                }
+                java.util.Map<String,String> meta=PublicMetadata.parse(html);String title=meta.get("title"),image=meta.get("thumbnail");boolean matchedNote=false;
+                // Prefer this exact note's own title and first image over the site's generic logo.
+                try{
+                    String state=PublicMetadata.stateJson(html);
+                    JSONObject note=new JSONObject(state).getJSONObject("note").getJSONObject("noteDetailMap").getJSONObject(XhsLinks.noteId(current)).getJSONObject("note");
+                    matchedNote=true;
+                    String t=note.optString("title","").trim();if(t.isEmpty())t=note.optString("desc","").split("\n",2)[0].trim();if(!t.isEmpty())title=t;
+                    org.json.JSONArray images=note.optJSONArray("imageList");
+                    if(images!=null&&images.length()>0){
+                        JSONObject first=images.optJSONObject(0);if(first!=null){
+                            String candidate=first.optString("urlDefault","");if(candidate.isEmpty())candidate=first.optString("urlPre","");if(candidate.isEmpty())candidate=first.optString("url","");
+                            org.json.JSONArray info=first.optJSONArray("infoList");if(candidate.isEmpty()&&info!=null&&info.length()>0&&info.optJSONObject(0)!=null)candidate=info.optJSONObject(0).optString("url","");
+                            if(!candidate.isEmpty())image=candidate;
+                        }
+                    }
+                }catch(Exception ignored){}
+                // Login/error pages must not replace a saved note title or masquerade as its cover.
+                if(title==null||title.trim().isEmpty())return new JSONObject();
+                if(!matchedNote&&title.matches("(?i)(?:小红书登录|登录小红书|安全验证|访问频繁|页面不存在|内容不存在|Sign.?in).*"))return new JSONObject().put("requiresLogin",true);
+                if(title.matches("(?:小红书|小红书\\s*[-–—]\\s*你的生活指南|小红书\\s*[-–—]\\s*你的生活兴趣社区)"))return new JSONObject().put("requiresLogin",true);
+                JSONObject result=new JSONObject().put("title",title.substring(0,Math.min(title.length(),500)));
+                if(image!=null&&!image.isEmpty()){
+                    image=image.replaceFirst("^//","https://").replaceFirst("(?i)^http:","https:");
+                    URL u=new URL(image);if("https".equals(u.getProtocol())&&u.getUserInfo()==null&&(u.getPort()==-1||u.getPort()==443))result.put("thumbnail",image);
+                }
+                return result;
+            }finally{c.disconnect();}
+        }
+        return new JSONObject();
+    }
     static void install(Activity activity,WebView web) {
         if(!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))return;
         WebViewCompat.addWebMessageListener(web,"ShiguangPreviewNative",Collections.singleton("https://appassets.androidplatform.net"),(v,message,origin,main,reply)->{
             if(!main||!"https://appassets.androidplatform.net".equals(origin.toString()))return;
             try{String raw=message.getData();if(raw==null||raw.length()>3000)return;JSONObject input=new JSONObject(raw);String id=input.getString("id"),url=input.getString("url");
-                new Thread(()->{JSONObject result=fetch(url);try{result.put("id",id);}catch(Exception ignored){}activity.runOnUiThread(()->{if(!activity.isFinishing()&&!activity.isDestroyed())reply.postMessage(result.toString());});},"shiguang-preview").start();
+                boolean xhsSession=XhsMetadataLoginActivity.enabled(activity);
+                new Thread(()->{JSONObject result=fetch(url,xhsSession);try{result.put("id",id);}catch(Exception ignored){}activity.runOnUiThread(()->{if(!activity.isFinishing()&&!activity.isDestroyed())reply.postMessage(result.toString());});},"shiguang-preview").start();
             }catch(Exception ignored){}
         });
     }

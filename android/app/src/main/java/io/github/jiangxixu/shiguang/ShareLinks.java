@@ -35,4 +35,10 @@ final class ShareLinks {
             switch(pkgs[0]){case "com.xingin.xhs":return "小红书";case "tv.danmaku.bili":return "哔哩哔哩";case "com.zhihu.android":return "知乎";case "com.ss.android.ugc.aweme":return "抖音";case "com.google.android.youtube":return "YouTube";case "com.github.android":return "GitHub";default:return h;}
         }catch(Exception e){return "网页";}
     }
+    static String sharedTitle(String text){
+        if(text==null)return "";
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("【([^【】\\r\\n]{1,500})\\s*\\|\\s*小红书(?:[^【】]*)】").matcher(text);
+        if(!m.find())return "";
+        String title=m.group(1).trim();int author=title.lastIndexOf(" - ");if(author>0)title=title.substring(0,author).trim();return title;
+    }
 }

@@ -42,6 +42,7 @@ public class QuickShareActivity extends Activity {
     }
     private void showCapture(String link,String text,String subject){
         String title=subject==null?"":subject.trim();
+        if(title.isEmpty())title=ShareLinks.sharedTitle(text);
         if(title.isEmpty())title=text.replace(link,"").replaceAll("^[\\s\\-—:：]+|[\\s\\-—:：]+$","");
         if(title.isEmpty())title=Uri.parse(link).getHost();
         JSONObject item=new JSONObject();

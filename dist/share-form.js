@@ -1,12 +1,12 @@
 (function(){
  'use strict';
- let draft=null,resolveDraft,saving=false,owner=null;
+ let draft=null,resolveDraft,saving=false,persisted=false,owner=null,metadata=Promise.resolve();
  const ready=new Promise(resolve=>resolveDraft=resolve);
  const report=data=>window.ShiguangQuickResult?.postMessage(JSON.stringify(data));
  window.shiguangReceiveShare=item=>{
   if(draft)return;draft=SG.normalize(item);resolveDraft();
   if(draft){const source=document.getElementById('platform');if(source)source.textContent='来源：'+(SG.platforms[draft.platform]?.name||'其他网站');}
-  if(draft)ShiguangPreview.fetch(draft).then(meta=>{if(!saving&&meta.thumbnail)draft.thumbnail=meta.thumbnail;if(!saving&&meta.title){draft.title=meta.title;document.getElementById('title').textContent=meta.title;}}).catch(()=>{});
+  if(draft)metadata=Promise.race([ShiguangPreview.fetch(draft),new Promise(resolve=>setTimeout(()=>resolve({}),12500))]).then(meta=>{if(persisted)return;if(meta.thumbnail)draft.thumbnail=SG.safeImage(meta.thumbnail);if(meta.title){draft.title=String(meta.title).slice(0,500);document.getElementById('title').textContent=draft.title;}if(meta.requiresLogin)document.getElementById('status').textContent='小红书要求网页登录。可先保存原链接，再到拾光「我 → 登录小红书补全信息」，登录后补全封面。';}).catch(()=>{});
  };
  window.ShiguangCloseCapture=()=>report({cancel:true});
  window.ShiguangCaptureTransport={async sendMessage(message){
@@ -20,7 +20,10 @@
   if(message.type==='SHIGUANG_CAPTURE_SAVE'){
    if(saving)throw Error('正在保存，请稍候');if(localStorage.getItem('shiguang.cloud.owner')!==owner)throw Error('账号已切换，请重新分享');saving=true;
    try{
+    await metadata;
+    if(localStorage.getItem('shiguang.cloud.owner')!==owner)throw Error('账号已切换，请重新分享');
     const result=ShiguangCapture.save(localStorage,[{...draft,tags:message.tags,notes:message.reason||''}]);
+    persisted=true;
     report({saved:true});
     let cloud=false;try{const result=await Promise.race([ShiguangCloud.sync(),new Promise(resolve=>setTimeout(()=>resolve({}),5000))]);cloud=!!result.signedIn&&result.pending===0;}catch{}
     report({done:true,cloud,duplicate:result.duplicates>0});return {ok:true,duplicate:result.duplicates>0};

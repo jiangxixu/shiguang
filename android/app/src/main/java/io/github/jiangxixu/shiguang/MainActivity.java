@@ -68,6 +68,13 @@ public class MainActivity extends Activity {
                         JSONObject response=new JSONObject();response.put("clipboard",text.substring(0,Math.min(10000,text.length())));reply.postMessage(response.toString());return;
                     }
                     String action=data.optString("action");
+                    if("xhsMetadataLogin".equals(action)){
+                        new android.app.AlertDialog.Builder(this).setTitle("登录小红书以补全收藏信息")
+                            .setMessage("小红书部分笔记需要网页登录才能取得标题和封面。继续后请你亲自在小红书网页登录。允许拾光仅在本机向小红书使用该网页的登录凭据，读取收藏链接的标题和封面；登录凭据不会上传到拾光云端。可在此处关闭授权。")
+                            .setPositiveButton("允许并打开登录页",(d,w)->{getSharedPreferences("preview",MODE_PRIVATE).edit().putBoolean("xhsWebSession",true).apply();startActivityForResult(new Intent(this,XhsMetadataLoginActivity.class),12);})
+                            .setNegativeButton("取消",null).show();return;
+                    }
+                    if("xhsMetadataDisable".equals(action)){getSharedPreferences("preview",MODE_PRIVATE).edit().putBoolean("xhsWebSession",false).apply();Toast.makeText(this,"已停止使用小红书网页登录凭据读取信息",Toast.LENGTH_LONG).show();return;}
                     if("calibrateAutoCapture".equals(action)){
                         if(!FavoriteCaptureService.enabled(this)||!FavoriteCaptureService.active()){Toast.makeText(this,"请先开启收藏跟随并连接无障碍服务",Toast.LENGTH_LONG).show();return;}
                         new android.app.AlertDialog.Builder(this).setTitle("适配哪个平台？").setItems(FavoriteRules.PLATFORMS,(d,index)->{
@@ -185,6 +192,7 @@ public class MainActivity extends Activity {
     }
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);loadIntent(intent);}
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);
+        if(request==12&&web!=null)web.evaluateJavascript("window.dispatchEvent(new Event('shiguang-preview-ready'))",null);
         if(request==10&&fileCallback!=null){fileCallback.onReceiveValue(result==RESULT_OK&&data!=null&&data.getData()!=null?new Uri[]{data.getData()}:null);fileCallback=null;}
         if(request==11){byte[] bytes=pendingExport;pendingExport=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null&&bytes!=null){try(OutputStream out=getContentResolver().openOutputStream(data.getData())){if(out==null)throw new Exception();out.write(bytes);Toast.makeText(this,"备份已保存",Toast.LENGTH_SHORT).show();}catch(Exception e){Toast.makeText(this,"保存失败，请重试导出备份",Toast.LENGTH_LONG).show();}}}
     }

@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.7\n\n收藏跟随及适配本机按钮增加知乎、抖音（含极速版）、YouTube；同时扩展无障碍监听范围、平台独立的按钮规则和原内容链接校验。YouTube 支持尝试识别保存到播放列表/稍后观看的按钮及确认提示。每个平台的规则单独保存，B站和抖音的不同版本仅在对应平台内适配。\n\n升级：覆盖安装，不卸载；关闭再开启系统中的拾光无障碍服务。进入我→适配本机按钮，选择平台，分别记录分享和收藏/保存按钮；分享按钮出现复制链接菜单后规则才生效。完成平台收藏确认后，取得本次原链接，再进入分类窗口由你确认保存。\n\n保留1.6.6的滚动容错及原内容核对。未取得原链接不保存，支持范围不代表所有App版本都已在实际手机验证。自动测试及编译不能替代手机实测。\n\n下载 shiguang-android.apk。网站：https://jiangxixu.github.io/shiguang/ 。Android 8.0及以上，固定签名。";
+ const notes="拾光 Android 1.6.8\n\n修复手机小红书收藏只有xhslink.cn域名标题及默认封面的问题：新增手机本地小红书公开笔记信息读取，识别xhslink.cn/.com短链并保留原访问参数，优先读取同一笔记的标题和首图，再使用网页OG信息。仅请求小红书允许域名，限制跳转次数、响应大小和等待时间，默认不携带账号Cookie、不执行网页脚本。遇到必须登录的笔记，新增“我→登录小红书补全信息”：经你同意并自行登录后，允许仅在本机向小红书使用该网页会话，不上传凭据；可关闭授权。收藏跟随也保留分享文字中明确的笔记标题，不再在链接校验时将标题丢弃。\n\n点保存时等候正在进行的标题/封面请求（有超时上限），减少先保存域名后返回真实信息的问题。打开知识库时，旧收藏缺失的封面及域名占位标题会尝试自动补全，保留分类、原因、手动标题及原链接；补全后沿用现有云端同步。网站和Android使用同一补全规则。\n\n覆盖安装，不卸载。联网打开拾光，等候补全及同步，再在电脑查看。小红书若要求登录、限制访问或不公开元信息，仍可能无法取得标题封面，不会把登录页当成原笔记。测试及编译不能替代你的实际链接和手机实测。\n\n下载shiguang-android.apk，Android8.0及以上，固定签名。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:false})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();
