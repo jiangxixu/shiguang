@@ -34,6 +34,7 @@ final class PreviewBridge {
     static JSONObject fetch(String value,boolean xhsSession) {
         try{
             if(XhsLinks.allowed(value))return xhs(value,xhsSession);
+            if(!ContentPreviewUrls.family(value).isEmpty())return content(value);
             if(value.length()>2000)return new JSONObject();URL url=new URL(value);
             for(int i=0;i<5;i++){
                 if(!allowed(url))return new JSONObject();
@@ -47,6 +48,34 @@ final class PreviewBridge {
                 try{int status=c.getResponseCode();if(status>=300&&status<400){String next=c.getHeaderField("Location");if(next==null)return new JSONObject();url=new URL(url,next);if("http".equals(url.getProtocol()))url=new URL(url.toString().replaceFirst("^http:","https:"));continue;}return new JSONObject();}finally{c.disconnect();}
             }
         }catch(Exception ignored){}
+        return new JSONObject();
+    }
+    private static JSONObject content(String value) throws Exception {
+        String family=ContentPreviewUrls.family(value),current=value;
+        if(family.equals("youtube"))current="https://www.youtube.com/oembed?url="+java.net.URLEncoder.encode(value,"UTF-8")+"&format=json";
+        long deadline=android.os.SystemClock.elapsedRealtime()+10000;
+        for(int hop=0;hop<5;hop++){
+            if(!ContentPreviewUrls.redirect(value,current))return new JSONObject();
+            long remaining=deadline-android.os.SystemClock.elapsedRealtime();if(remaining<=0)return new JSONObject();
+            HttpsURLConnection c=(HttpsURLConnection)new URL(current).openConnection();c.setInstanceFollowRedirects(false);
+            c.setConnectTimeout((int)Math.min(3000,remaining));c.setReadTimeout((int)Math.min(3000,remaining));c.setRequestProperty("User-Agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36");
+            try{
+                int status=c.getResponseCode();
+                if(status>=300&&status<400){String location=c.getHeaderField("Location");if(location==null)return new JSONObject();current=new URL(new URL(current),location).toString();continue;}
+                if(status!=200)return new JSONObject();
+                String body;
+                try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
+                    byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(out.size()+n>2000000||android.os.SystemClock.elapsedRealtime()>=deadline)return new JSONObject();out.write(buffer,0,n);}body=new String(out.toByteArray(),StandardCharsets.UTF_8);
+                }
+                String title,image;
+                if(family.equals("youtube")){JSONObject data=new JSONObject(body);title=data.optString("title","");image=data.optString("thumbnail_url","");}
+                else{java.util.Map<String,String> meta=PublicMetadata.parse(body);title=meta.get("title");image=meta.get("thumbnail");}
+                title=ContentPreviewUrls.title(title);if(title.isEmpty())return new JSONObject();
+                JSONObject result=new JSONObject().put("title",title);
+                if(image!=null&&!image.isEmpty()){image=new URL(new URL(current),image).toString().replaceFirst("(?i)^http:","https:");URL u=new URL(image);if("https".equals(u.getProtocol())&&u.getUserInfo()==null&&(u.getPort()==-1||u.getPort()==443))result.put("thumbnail",image);}
+                return result;
+            }finally{c.disconnect();}
+        }
         return new JSONObject();
     }
     private static JSONObject xhs(String value,boolean session) throws Exception {

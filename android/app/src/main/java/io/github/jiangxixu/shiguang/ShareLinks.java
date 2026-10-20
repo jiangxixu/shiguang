@@ -38,7 +38,15 @@ final class ShareLinks {
     static String sharedTitle(String text){
         if(text==null)return "";
         java.util.regex.Matcher m=java.util.regex.Pattern.compile("【([^【】\\r\\n]{1,500})\\s*\\|\\s*小红书(?:[^【】]*)】").matcher(text);
-        if(!m.find())return "";
-        String title=m.group(1).trim();int author=title.lastIndexOf(" - ");if(author>0)title=title.substring(0,author).trim();return title;
+        if(m.find()){String title=m.group(1).trim();int author=title.lastIndexOf(" - ");if(author>0)title=title.substring(0,author).trim();return title;}
+        List<String> links=candidates(text);
+        if(links.size()==1&&platformName(links.get(0)).equals("知乎")){
+            Matcher link=LINK.matcher(text);String prefix=link.find()?text.substring(0,link.start()).trim():"";
+            for(String line:prefix.split("[\\r\\n]+")){
+                String title=line.trim().replaceFirst("\\s*[-—]\\s*知乎\\s*$","").replaceAll("^[「【]|[」】]$","").trim();
+                if(title.length()>=2&&title.length()<=500&&!title.matches("(?:知乎|分享自知乎|打开知乎.*|来自知乎.*)"))return title;
+            }
+        }
+        return "";
     }
 }

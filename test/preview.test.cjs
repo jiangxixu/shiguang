@@ -7,6 +7,20 @@ test('Android fetches public Bilibili metadata on the phone without requiring a 
  const result=await page.ShiguangPreview.fetch({url:'https://www.bilibili.com/video/BV123'});assert.equal(result.thumbnail,'https://i0.hdslb.com/test.jpg');assert.equal(result.title,'视频');
 });
 
+test('Zhihu Douyin and YouTube use native title fetching even when YouTube already has a derived cover',async()=>{
+ const calls=[];const page={window:null,SG,URL,setTimeout,clearTimeout,ShiguangPreviewNative:{postMessage(raw){const data=JSON.parse(raw);calls.push(data.url);queueMicrotask(()=>this.onmessage({data:JSON.stringify({id:data.id,title:'原内容标题',thumbnail:'https://example.com/cover.jpg'})}));}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);
+ for(const url of ['https://zhihu.link/abc','https://v.douyin.com/abc/','https://youtu.be/AbC123_-xyZ']){
+  const item=SG.normalize({url}),meta=await page.ShiguangPreview.fetch(item);assert.equal(meta.title,'原内容标题');assert.equal(calls.at(-1),item.url);
+ }
+});
+
+test('YouTube retains its derived cover if native title lookup cannot return metadata',async()=>{
+ const page={window:null,SG,URL,setTimeout,clearTimeout,ShiguangPreviewNative:{postMessage(raw){const data=JSON.parse(raw);queueMicrotask(()=>this.onmessage({data:JSON.stringify({id:data.id})}));}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);
+ const meta=await page.ShiguangPreview.fetch(SG.normalize({url:'https://youtu.be/AbC123_-xyZ'}));assert.equal(meta.thumbnail,'https://i.ytimg.com/vi/AbC123_-xyZ/hqdefault.jpg');
+});
+
 test('Xiaohongshu cn short links use phone metadata while signed out and repair only missing metadata',async()=>{
  let called='';const page={window:null,SG,URL,setTimeout,clearTimeout,ShiguangPreviewNative:{postMessage(raw){const data=JSON.parse(raw);called=data.url;queueMicrotask(()=>this.onmessage({data:JSON.stringify({id:data.id,thumbnail:'https://sns-webpic-qc.xhscdn.com/note.jpg',title:'建议研一开始准备小论文'})}));}}};page.window=page;
  vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);

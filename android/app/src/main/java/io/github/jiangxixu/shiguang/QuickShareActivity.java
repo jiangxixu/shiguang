@@ -35,11 +35,12 @@ public class QuickShareActivity extends Activity {
         if(links.size()>1){
             String[] choices=new String[links.size()];for(int i=0;i<links.size();i++)choices[i]=ShareLinks.platformName(links.get(i))+"\n"+links.get(i);
             new android.app.AlertDialog.Builder(this).setTitle("复制内容里有多个链接，请选择要收藏的内容")
-                .setItems(choices,(dialog,index)->showCapture(links.get(index),text,intent.getStringExtra(Intent.EXTRA_SUBJECT)))
+                .setItems(choices,(dialog,index)->showCapture(links.get(index),text,sharedSubject(intent)))
                 .setNegativeButton("取消",(dialog,index)->finish()).setOnCancelListener(dialog->finish()).show();return;
         }
-        showCapture(links.get(0),text,intent.getStringExtra(Intent.EXTRA_SUBJECT));
+        showCapture(links.get(0),text,sharedSubject(intent));
     }
+    private String sharedSubject(Intent intent){CharSequence subject=intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT);if(subject==null||subject.toString().trim().isEmpty())subject=intent.getCharSequenceExtra(Intent.EXTRA_TITLE);return subject==null?"":subject.toString();}
     private void showCapture(String link,String text,String subject){
         String title=subject==null?"":subject.trim();
         if(title.isEmpty())title=ShareLinks.sharedTitle(text);

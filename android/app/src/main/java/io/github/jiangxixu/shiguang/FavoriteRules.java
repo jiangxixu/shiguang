@@ -15,6 +15,7 @@ final class FavoriteRules {
     static boolean supported(String pkg){return platform(pkg)>=0;}
     static boolean samePlatform(String a,String b){return platform(a)>=0&&platform(a)==platform(b);}
     static String platformName(String pkg){int p=platform(pkg);return p<0?"原 App":PLATFORMS[p];}
+    static boolean shareSheet(String pkg){return "android".equals(pkg)||"com.android.intentresolver".equals(pkg)||"com.google.android.intentresolver".equals(pkg);}
     static String clean(String s){return s==null?"":s.replaceAll("\\s+","").trim();}
     private static String control(String label){return clean(label).replaceAll("[,，](?:按钮|未选中|已选中|双击激活|点按两次即可激活)","");}
     static boolean favoriteButton(String label){String s=control(label);return s.matches("(?i)(?:收藏|收藏按钮|收藏此笔记|添加收藏|加入收藏|保存|保存到播放列表|保存至播放列表|稍后观看|加入稍后观看|儲存|儲存至播放清單|稍後觀看|Favorite|Save|Savetoplaylist|Savetowatchlater)(?:[,，:：]?\\d+(?:\\.\\d+)?[万千wWkK]?)?");}
@@ -22,6 +23,7 @@ final class FavoriteRules {
     static boolean savedState(String label){return savedButton(label)||clean(label).matches("(?:已选中|已勾选|选中)")||clean(label).matches(".*[,，](?:已选中|已勾选)(?:[,，].*)?");}
     static boolean success(String label){String s=clean(label);return s.matches("(?:收藏成功|已收藏|已添加到收藏夹|成功添加到收藏夹|保存成功)[!！。]?")||s.matches("(?i)(?:已保存到|已保存至|已儲存至|Savedto|Addedto).{1,100}");}
     static boolean copy(String label){String s=control(label);return s.equals("复制链接")||s.equals("复制链接按钮")||s.equals("复制笔记链接")||s.equals("拷贝链接")||s.equals("複製連結")||s.equalsIgnoreCase("Copylink");}
+    static boolean systemCopy(String label){String s=control(label);return copy(label)||s.equals("复制")||s.equalsIgnoreCase("Copy");}
     static boolean share(String label){String s=control(label);return s.equals("分享")||s.equals("分享按钮")||s.equals("分享笔记")||s.equals("分享视频")||s.equals("分享回答")||s.equals("分享文章")||s.equals("共享")||s.equalsIgnoreCase("Share");}
     static boolean roleId(String pkg,String id,String role){
         if(!supported(pkg)||id==null||!id.startsWith(pkg+":id/"))return false;
@@ -40,7 +42,7 @@ final class FavoriteRules {
                 ||((h.equals("xiaohongshu.com")||h.endsWith(".xiaohongshu.com"))&&path.matches("/(?:explore|discovery/item)/[a-fA-F0-9]{24}/?"));
             if(platform(pkg)==1)return (h.equals("b23.tv")&&path.matches("/[A-Za-z0-9]+/?"))||(host(h,"bilibili.com")&&path.matches("/video/(?:BV[A-Za-z0-9]+|av[0-9]+)/?"));
             if(platform(pkg)==2)return (h.equals("zhihu.link")&&path.matches("/[A-Za-z0-9_-]+/?"))||(host(h,"zhihu.com")&&(path.matches("/(?:question/[0-9]+(?:/answer/[0-9]+)?|answer/[0-9]+|p/[0-9]+|zvideo/[0-9]+|pin/[0-9]+)/?")));
-            if(platform(pkg)==3)return (h.equals("v.douyin.com")&&path.matches("/[A-Za-z0-9_-]+/?"))||((host(h,"douyin.com")||host(h,"iesdouyin.com"))&&path.matches("/(?:share/)?(?:video|note)/[0-9]+/?"));
+            if(platform(pkg)==3)return (h.equals("v.douyin.com")&&path.matches("/[A-Za-z0-9_-]+/?"))||((host(h,"douyin.com")||host(h,"iesdouyin.com"))&&(path.matches("/(?:share/)?(?:video|note)/[0-9]+/?")||((path.equals("/")||path.equals("/discover"))&&u.getRawQuery()!=null&&java.util.regex.Pattern.compile("(?:^|&)modal_id=[0-9]+(?:&|$)").matcher(u.getRawQuery()).find())));
             if(platform(pkg)==4){
                 if(h.equals("youtu.be"))return path.matches("/[A-Za-z0-9_-]{11}/?");
                 if(!host(h,"youtube.com"))return false;

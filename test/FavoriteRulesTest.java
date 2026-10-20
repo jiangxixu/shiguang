@@ -41,6 +41,10 @@ public class FavoriteRulesTest {
         check(!FavoriteRules.favoriteButton("Saved"));check(!FavoriteRules.favoriteButton("Remove from Watch later"));check(!FavoriteRules.favoriteButton("点赞"));
         check(FavoriteRules.success("Saved to Watch later"));check(FavoriteRules.success("已保存到稍后观看"));
         check(!FavoriteRules.success("Removed from Watch later"));check(!FavoriteRules.success("已从播放列表移除"));
+        check(FavoriteRules.shareSheet("com.android.intentresolver"));check(FavoriteRules.shareSheet("android"));check(!FavoriteRules.shareSheet("evil.app"));
+        check(FavoriteRules.contentUrl(douyin,"https://www.douyin.com/?modal_id=123456"));
+        check(!FavoriteRules.contentUrl(douyin,"https://www.douyin.com/?modal_id=abc"));
+        check(!FavoriteRules.contentUrl(douyin,"https://www.douyin.com/user/123?modal_id=456"));
         System.out.println("Favorite/cancel distinction and real platform-content URL validation passed.");
     }
 }

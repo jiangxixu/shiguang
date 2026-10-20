@@ -167,7 +167,11 @@ public class FavoriteCaptureService extends AccessibilityService {
         }
         return null;
     }
-    private AccessibilityNodeInfo root(){AccessibilityNodeInfo node=platformRoot(pendingPackage);boundFavorite=FavoriteBindings.find(this,pendingPackage,"favorite",node,nodes(node));return node;}
+    private AccessibilityNodeInfo root(){
+        AccessibilityNodeInfo node=platformRoot(pendingPackage);
+        if(phase==2||(phase==4&&learningRole.equals("share"))){AccessibilityNodeInfo active=getRootInActiveWindow();if(active!=null&&FavoriteRules.shareSheet(text(active.getPackageName())))node=active;}
+        boundFavorite=FavoriteBindings.find(this,pendingPackage,"favorite",node,nodes(node));return node;
+    }
     private List<AccessibilityNodeInfo> nodes(AccessibilityNodeInfo root){
         List<AccessibilityNodeInfo> result=new ArrayList<>();if(root==null)return result;
         ArrayDeque<AccessibilityNodeInfo> queue=new ArrayDeque<>();queue.add(root);
@@ -210,8 +214,14 @@ public class FavoriteCaptureService extends AccessibilityService {
         Map<String,AccessibilityNodeInfo> matches=new LinkedHashMap<>();
         for(AccessibilityNodeInfo n:nodes(root)){
             String t=text(n.getText()),d=text(n.getContentDescription());
-            if(!(FavoriteRules.roleId(pendingPackage,n.getViewIdResourceName(),copy?"copy":"share")||(copy?(FavoriteRules.copy(t)||FavoriteRules.copy(d)):(FavoriteRules.share(t)||FavoriteRules.share(d)))))continue;
-            AccessibilityNodeInfo target=n;for(int i=0;!target.isClickable()&&i<2;i++){target=target.getParent();if(target==null)break;}
+            boolean copyText=FavoriteRules.copy(t)||FavoriteRules.copy(d)||(FavoriteRules.shareSheet(text(n.getPackageName()))&&(FavoriteRules.systemCopy(t)||FavoriteRules.systemCopy(d)));
+            if(!(FavoriteRules.roleId(pendingPackage,n.getViewIdResourceName(),copy?"copy":"share")||(copy?copyText:(FavoriteRules.share(t)||FavoriteRules.share(d)))))continue;
+            AccessibilityNodeInfo target=n;for(int i=0;!target.isClickable()&&i<2;i++){
+                AccessibilityNodeInfo parent=target.getParent();if(parent==null)break;
+                android.graphics.Rect bounds=new android.graphics.Rect();parent.getBoundsInScreen(bounds);android.util.DisplayMetrics metrics=getResources().getDisplayMetrics();
+                if(!CaptureClickBounds.allowed(bounds.width(),bounds.height(),metrics.widthPixels,metrics.heightPixels,metrics.density,copy))break;
+                target=parent;
+            }
             if(target==null||!target.isClickable())target=n;
             if(target.isEnabled()&&target.isVisibleToUser()){
                 android.graphics.Rect bounds=new android.graphics.Rect();target.getBoundsInScreen(bounds);matches.put(bounds.toString(),target);
@@ -223,11 +233,20 @@ public class FavoriteCaptureService extends AccessibilityService {
     private boolean clickNode(AccessibilityNodeInfo node){
         if(node==null||!node.isVisibleToUser()||!node.isEnabled()||node.isEditable()||node.isPassword())return false;
         android.graphics.Rect r=new android.graphics.Rect();node.getBoundsInScreen(r);
-        if(r.isEmpty()||r.width()>getResources().getDisplayMetrics().widthPixels*0.6||r.height()>getResources().getDisplayMetrics().heightPixels*0.25)return false;
+        android.util.DisplayMetrics metrics=getResources().getDisplayMetrics();
+        boolean copyLabel=(phase==2)&&copyLabel(node);
+        if(!CaptureClickBounds.allowed(r.width(),r.height(),metrics.widthPixels,metrics.heightPixels,metrics.density,copyLabel)){if(phase==2)state("复制控件范围无法核对（"+r.width()+"×"+r.height()+"），未执行触摸");return false;}
         if(node.performAction(AccessibilityNodeInfo.ACTION_CLICK))return true;
         android.graphics.Path path=new android.graphics.Path();path.moveTo(r.exactCenterX(),r.exactCenterY());
         return dispatchGesture(new android.accessibilityservice.GestureDescription.Builder().addStroke(new android.accessibilityservice.GestureDescription.StrokeDescription(path,0,70)).build(),null,null);
     }
+    private boolean copyLabel(AccessibilityNodeInfo n){
+        boolean system=FavoriteRules.shareSheet(text(n.getPackageName()));
+        if(copyLabelText(n,system))return true;
+        for(int i=0;i<n.getChildCount()&&i<12;i++){AccessibilityNodeInfo child=n.getChild(i);if(child==null)continue;if(copyLabelText(child,system))return true;for(int j=0;j<child.getChildCount()&&j<12;j++){AccessibilityNodeInfo grandchild=child.getChild(j);if(grandchild!=null&&copyLabelText(grandchild,system))return true;}}
+        return false;
+    }
+    private boolean copyLabelText(AccessibilityNodeInfo n,boolean system){String t=text(n.getText()),d=text(n.getContentDescription());return system?(FavoriteRules.systemCopy(t)||FavoriteRules.systemCopy(d)):(FavoriteRules.copy(t)||FavoriteRules.copy(d));}
     private void beginShare(){
         if(phase!=1||!enabled(this))return;
         if(root()==null){fail("无法读取原平台当前窗口，本次未保存");return;}
@@ -248,7 +267,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             if(!clicked){fail("未能复制原内容链接，本次未保存");return;}phase=3;
             handler.postDelayed(()->{
                 if(!enabled(FavoriteCaptureService.this))return;
-                AccessibilityNodeInfo current=getRootInActiveWindow();if(current==null||!pkg.equals(text(current.getPackageName()))){fail("复制后已离开原平台，本次未保存");return;}
+                AccessibilityNodeInfo current=getRootInActiveWindow();if(current==null||(!pkg.equals(text(current.getPackageName()))&&!FavoriteRules.shareSheet(text(current.getPackageName())))){fail("复制后已离开原平台，本次未保存");return;}
                 try{
                     launchCapture(pkg,timestamp);
                 }catch(Exception e){offerCapture(pkg,timestamp);}
@@ -313,7 +332,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(!shown){fail("无法显示分类提示，请使用原内容的分享→拾光；未保存");return;}
         handler.postDelayed(()->{reset();state("分类提示已超时，本次未保存");},45000);
     }
-    private void fail(String message){reset();state(message);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}
+    private void fail(String message){String platform=pendingPackage;reset();state(FavoriteRules.platformName(platform)+" · "+message);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}
     @Override public void onInterrupt(){reset();state("服务被系统中断，请返回无障碍设置检查");}
     @Override public void onDestroy(){reset();if(instance==this)instance=null;super.onDestroy();}
 }

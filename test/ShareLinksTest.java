@@ -20,6 +20,9 @@ public class ShareLinksTest {
         check(ShareLinks.sharedTitle("【标题 - 第二部分 - 作者 | 小红书】").equals("标题 - 第二部分"));
         check(ShareLinks.sharedTitle("https://xhslink.cn/o/abc").isEmpty());
         check(ShareLinks.sharedTitle("复制链接，打开【小红书】查看").isEmpty());
+        check(ShareLinks.sharedTitle("为什么要学习机器人？ - 知乎 https://www.zhihu.com/question/123/answer/456").equals("为什么要学习机器人？"));
+        check(ShareLinks.sharedTitle("问题标题\nhttps://zhihu.link/abc").equals("问题标题"));
+        check(ShareLinks.sharedTitle("https://zhihu.link/abc").isEmpty());
         System.out.println("Copied share prose, platform priority, URL choice, Unicode, access-token and domain-spoof regression tests passed.");
     }
 }
