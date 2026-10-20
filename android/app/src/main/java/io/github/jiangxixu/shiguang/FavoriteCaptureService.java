@@ -282,7 +282,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(phase!=2||!enabled(FavoriteCaptureService.this)){reset();return;}
         AccessibilityNodeInfo copy=button(true);
         if(copy!=null){
-            if(!pendingShareRule.isEmpty())FavoriteBindings.save(this,pendingPackage,"share",pendingShareRule);
+            if(!pendingShareRule.isEmpty())FavoriteBindings.save(FavoriteCaptureService.this,pendingPackage,"share",pendingShareRule);
             if(prompt!=null){prompt.dismiss();prompt=null;}
             String pkg=pendingPackage;long timestamp=System.currentTimeMillis();
             boolean clicked=clickNode(copy);
