@@ -68,6 +68,10 @@ public class MainActivity extends Activity {
                         JSONObject response=new JSONObject();response.put("clipboard",text.substring(0,Math.min(10000,text.length())));reply.postMessage(response.toString());return;
                     }
                     String action=data.optString("action");
+                    if("autoCaptureDiagnostics".equals(action)){
+                        String details="拾光 "+BuildConfig.VERSION_NAME+"\n应用开关："+(FavoriteCaptureService.enabled(this)?"已开启":"已关闭")+"\n无障碍连接："+(FavoriteCaptureService.active()?"已连接":"未连接")+"\n\n"+FavoriteCaptureService.history(this);
+                        new android.app.AlertDialog.Builder(this).setTitle("收藏跟随 · 本机检测记录").setMessage(details).setPositiveButton("知道了",null).setNeutralButton("复制记录",(d,w)->{((android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(android.content.ClipData.newPlainText("拾光检测记录",details));}).show();return;
+                    }
                     if("enableAutoCapture".equals(action)){enableAutoCapture();return;}
                     if("disableAutoCapture".equals(action)){FavoriteCaptureService.pause(this);updateAutoState();Toast.makeText(this,"自动跟随收藏已关闭",Toast.LENGTH_SHORT).show();return;}
                     if("openLink".equals(action)){external(Uri.parse(data.optString("url")));return;}
@@ -96,7 +100,7 @@ public class MainActivity extends Activity {
     }
     private void enableAutoCapture(){
         new android.app.AlertDialog.Builder(this).setTitle("启用收藏跟随（试用）")
-            .setMessage("仅适配小红书、B站的可识别按钮。允许拾光读取这些 App 的按钮文字和收藏状态；识别收藏后，尝试自动打开分享菜单并点击复制链接，再弹出分类窗口。只有你确认保存，原链接及填写的信息才会同步。\n\n不读取密码、不上传页面树，不操作点赞或取消收藏。没有取得新原链接就不保存。不同版本可能无法识别，尚未在你的手机验证。可随时关闭。")
+            .setMessage("仅适配小红书、B站的可识别按钮。允许拾光在这些 App 的前台页面本地比较收藏前后的按钮状态；确认新增收藏后，尝试自动打开分享菜单并点击复制链接，再弹出分类窗口。系统拦截弹窗时，显示可点击的「选择分类」提示。只有你确认保存，原链接及填写的信息才会同步。\n\n不读取密码、不上传页面树，不操作点赞或取消收藏。没有取得新原链接就不保存。不同版本可能无法识别，尚未在你的手机验证。可随时关闭。")
             .setNegativeButton("暂不开启",null).setPositiveButton("同意并前往系统开启",(dialog,which)->{
                 stopService(new Intent(this,FloatingCaptureService.class));
                 getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",true).apply();

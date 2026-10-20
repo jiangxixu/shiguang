@@ -12,6 +12,8 @@ public class FavoriteRulesTest {
         check(FavoriteRules.share("分享笔记"));check(!FavoriteRules.share("更多"));
         check(FavoriteRules.share("分享按钮"));check(FavoriteRules.share("分享,按钮"));check(FavoriteRules.copy("复制链接，按钮"));
         check(!FavoriteRules.favoriteButton("她说收藏,按钮"));check(!FavoriteRules.share("分享给好友"));
+        check(FavoriteRules.savedState("收藏,已选中"));check(FavoriteRules.savedState("已选中"));
+        check(!FavoriteRules.savedState("收藏,未选中"));check(!FavoriteRules.savedState("未选中"));
         String xhs="com.xingin.xhs",bili="tv.danmaku.bili";
         check(FavoriteRules.contentUrl(xhs,"https://xhslink.cn/o/Abc123"));
         check(FavoriteRules.contentUrl(xhs,"https://www.xiaohongshu.com/explore/0123456789abcdef01234567?xsec_token=a%2Bb"));

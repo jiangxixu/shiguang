@@ -39,6 +39,8 @@ jobs:
           java -cp "$RUNNER_TEMP/favorite-test" io.github.jiangxixu.shiguang.FavoriteRulesTest
           javac -d "$RUNNER_TEMP/favorite-test" android/app/src/main/java/io/github/jiangxixu/shiguang/FavoriteWait.java test/FavoriteWaitTest.java
           java -cp "$RUNNER_TEMP/favorite-test" io.github.jiangxixu.shiguang.FavoriteWaitTest
+          javac -d "$RUNNER_TEMP/favorite-test" android/app/src/main/java/io/github/jiangxixu/shiguang/FavoriteTransitions.java test/FavoriteTransitionsTest.java
+          java -cp "$RUNNER_TEMP/favorite-test" io.github.jiangxixu.shiguang.FavoriteTransitionsTest
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.13'

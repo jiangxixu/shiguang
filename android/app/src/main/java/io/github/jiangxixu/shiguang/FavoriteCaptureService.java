@@ -15,19 +15,36 @@ public class FavoriteCaptureService extends AccessibilityService {
     private String clickedKey="";
     private final FavoriteWait wait=new FavoriteWait();
     private int phase; // 0 idle, 1 waiting for favorite success, 2 locating copy-link action
-    private final Map<String,Boolean> previousStates=new HashMap<>();
-    private long lastObserved;
+    private final FavoriteTransitions transitions=new FavoriteTransitions();
+    private FavoritePrompt prompt;
+    private String observedPackage="";
+    private long suppressUntil;
+    private long lastObserved,lastDiagnostic;
+    private final Runnable sample=new Runnable(){public void run(){
+        if(!enabled(FavoriteCaptureService.this)||phase!=0)return;
+        AccessibilityNodeInfo root=getRootInActiveWindow();
+        String pkg=root==null?"":text(root.getPackageName());
+        if(!FavoriteRules.supported(pkg)){transitions.clear();observedPackage="";return;}
+        observe(pkg);
+        if(phase==0)handler.postDelayed(this,500);
+    }};
     private static FavoriteCaptureService instance;
     static boolean active(){return instance!=null;}
     static String status(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getString("status","尚未检测到收藏操作");}
-    static void report(Context c,String text){getPrefs(c).edit().putString("status",new java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.ROOT).format(new Date())+" · "+text).apply();}
+    static void report(Context c,String text){
+        String line=new java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.ROOT).format(new Date())+" · "+text;
+        String[] old=getPrefs(c).getString("history","").split("\n");
+        StringBuilder history=new StringBuilder();for(int i=Math.max(0,old.length-11);i<old.length;i++)if(!old[i].isEmpty())history.append(old[i]).append('\n');
+        history.append(line);getPrefs(c).edit().putString("status",line).putString("history",history.toString()).apply();
+    }
+    static String history(Context c){return getPrefs(c).getString("history","暂无检测记录");}
     private static android.content.SharedPreferences getPrefs(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE);}
     static void acknowledge(Context c,long id){getPrefs(c).edit().putLong("launchAck",id).apply();report(c,"已打开链接校验窗口");}
     private void state(String text){report(this,text);}
     static boolean enabled(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getBoolean("enabled",false);}
     static void pause(Context c){c.getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();if(instance!=null){instance.reset();instance.disableSelf();}}
-    @Override protected void onServiceConnected(){instance=this;state("服务已连接，等待小红书或B站的收藏操作");}
-    private void reset(){handler.removeCallbacksAndMessages(null);phase=0;pendingPackage="";clickedKey="";}
+    @Override protected void onServiceConnected(){instance=this;state("服务已连接，等待小红书或B站的收藏操作");handler.post(sample);}
+    private void reset(){handler.removeCallbacksAndMessages(null);if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";clickedKey="";transitions.clear();observedPackage="";}
     private String text(CharSequence value){return value==null?"":value.toString();}
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(!enabled(this)){reset();return;}
@@ -35,16 +52,18 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(phase!=0&&!pkg.equals(pendingPackage)){fail("已切换平台，本次收藏跟随已取消，未保存");return;}
         long now=SystemClock.elapsedRealtime();
         if(phase>=2)return;
-        if(event.getEventType()==AccessibilityEvent.TYPE_VIEW_SCROLLED){if(phase!=0)fail("页面发生滚动，本次跟随已停止，未保存");previousStates.clear();return;}
-        if(phase==0&&event.getEventType()==AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED&&now-lastObserved>400){
-            lastObserved=now;observe(pkg);return;
+        if(event.getEventType()==AccessibilityEvent.TYPE_VIEW_SCROLLED){if(phase!=0)fail("页面发生滚动，本次跟随已停止，未保存");transitions.clear();suppressUntil=now+700;return;}
+        if(phase==0){
+            if(!pkg.equals(observedPackage)){transitions.clear();observedPackage=pkg;handler.removeCallbacks(sample);handler.post(sample);}
+            int type=event.getEventType();
+            if(type!=AccessibilityEvent.TYPE_VIEW_CLICKED&&now-lastObserved>150){lastObserved=now;observe(pkg);}
         }
         if(event.getEventType()==AccessibilityEvent.TYPE_VIEW_CLICKED){
             AccessibilityNodeInfo source=event.getSource();
             if(source!=null&&(source.isPassword()||source.isEditable()))return;
             source=favoriteSource(source);
             String label=text(event.getContentDescription());
-            Boolean previous=source==null?null:previousStates.get(nodeKey(source));
+            Boolean previous=source==null?null:transitions.previous(scope(pkg,source.getWindowId()),nodeKey(source),now);
             boolean newlySelected=source!=null&&Boolean.FALSE.equals(previous)&&selected(source);
             if(FavoriteRules.savedButton(label)&&!newlySelected){state("收到已收藏/取消收藏按钮，未确认新增收藏，未保存");return;}
             for(CharSequence s:event.getText())if(FavoriteRules.savedButton(text(s))&&!newlySelected){state("收到已收藏/取消收藏按钮，未确认新增收藏，未保存");return;}
@@ -54,13 +73,11 @@ public class FavoriteCaptureService extends AccessibilityService {
             if(!FavoriteRules.favoriteButton(label)&&source!=null){String t=text(source.getText()),d=text(source.getContentDescription());if(FavoriteRules.favoriteButton(t))label=t;else if(FavoriteRules.favoriteButton(d))label=d;}
             if(!FavoriteRules.favoriteButton(label)&&source!=null&&(FavoriteRules.savedButton(text(source.getText()))||FavoriteRules.savedButton(text(source.getContentDescription())))){state("收到已收藏按钮，但缺少收藏前状态；未执行自动保存");return;}
             if(FavoriteRules.favoriteButton(label)&&now-lastAttempt>4000){
-                reset();pendingPackage=pkg;phase=1;wait.start(now);clickedKey=source==null?"":nodeKey(source);
-                state("已识别收藏按钮，等待平台确认收藏成功");
-                Toast.makeText(this,"拾光已识别收藏，正在确认原平台状态…",Toast.LENGTH_SHORT).show();
-                handler.postDelayed(confirm,250);
+                startFavorite(pkg,source==null?"":nodeKey(source),false);
+                // The event can already contain the post-click state.
                 // Checked/selected state must confirm a save; opening a Bilibili folder picker alone is not enough.
                 if(source!=null&&selected(source))wait.confirm(now);
-            }else if(phase==0){state("已收到"+(pkg.equals("com.xingin.xhs")?"小红书":"B站")+"点击，但未匹配到收藏控件；未保存");}
+            }else if(phase==0){observe(pkg);}
         }
         if(phase==1){
             boolean saved=FavoriteRules.success(text(event.getContentDescription()));
@@ -69,29 +86,64 @@ public class FavoriteCaptureService extends AccessibilityService {
         }
     }
     private final Runnable confirm=this::confirmSaved;
-    private String nodeKey(AccessibilityNodeInfo n){android.graphics.Rect r=new android.graphics.Rect();n.getBoundsInScreen(r);return n.getWindowId()+":"+n.getViewIdResourceName()+":"+r;}
-    private boolean selected(AccessibilityNodeInfo n){return n.isSelected()||n.isChecked()||FavoriteRules.savedButton(text(n.getContentDescription()))||FavoriteRules.savedButton(text(n.getText()));}
+    private AccessibilityNodeInfo control(AccessibilityNodeInfo n){
+        if(n.isClickable())return n;
+        AccessibilityNodeInfo parent=n;
+        for(int i=0;i<2;i++){
+            parent=parent.getParent();if(parent==null||parent.isEditable()||parent.isPassword())break;
+            android.graphics.Rect bounds=new android.graphics.Rect();parent.getBoundsInScreen(bounds);
+            if(parent.isClickable()&&bounds.width()<=getResources().getDisplayMetrics().widthPixels/2&&bounds.height()<=100*getResources().getDisplayMetrics().density)return parent;
+        }
+        return n;
+    }
+    private String nodeKey(AccessibilityNodeInfo n){n=control(n);android.graphics.Rect r=new android.graphics.Rect();n.getBoundsInScreen(r);return n.getWindowId()+":"+n.getViewIdResourceName()+":"+r;}
+    private boolean selected(AccessibilityNodeInfo n){
+        AccessibilityNodeInfo target=control(n);
+        return n.isSelected()||n.isChecked()||target.isSelected()||target.isChecked()||FavoriteRules.savedState(text(n.getContentDescription()))||FavoriteRules.savedState(text(n.getText()))
+            ||(Build.VERSION.SDK_INT>=30&&(FavoriteRules.savedState(text(n.getStateDescription()))||FavoriteRules.savedState(text(target.getStateDescription()))));
+    }
     private boolean favoriteNode(AccessibilityNodeInfo n){return n!=null&&(FavoriteRules.favoriteButton(text(n.getText()))||FavoriteRules.favoriteButton(text(n.getContentDescription()))||FavoriteRules.savedButton(text(n.getText()))||FavoriteRules.savedButton(text(n.getContentDescription())));}
     private AccessibilityNodeInfo favoriteSource(AccessibilityNodeInfo source){
         if(source==null||favoriteNode(source))return source;
+        AccessibilityNodeInfo parent=source;
+        for(int i=0;i<2;i++){parent=parent.getParent();if(parent==null)break;if(favoriteNode(parent))return parent;}
         // A clickable container may expose its label only on a direct child. Never search the entire page for a click match.
         AccessibilityNodeInfo match=null;
         for(int i=0;i<source.getChildCount()&&i<12;i++){AccessibilityNodeInfo child=source.getChild(i);if(child!=null&&!child.isPassword()&&!child.isEditable()&&child.isVisibleToUser()&&favoriteNode(child)){if(match!=null)return source;match=child;}}
         return match==null?source:match;
     }
-    private void observe(String pkg){
-        AccessibilityNodeInfo root=getRootInActiveWindow();if(root==null||!pkg.equals(text(root.getPackageName())))return;
-        previousStates.clear();
-        for(AccessibilityNodeInfo n:nodes(root)){
-            String t=text(n.getText()),d=text(n.getContentDescription());
-            if(favoriteNode(n))previousStates.put(nodeKey(n),selected(n));
-        }
+    private String scope(String pkg,int window){return pkg+":"+window;}
+    private void startFavorite(String pkg,String key,boolean confirmed){
+        long now=SystemClock.elapsedRealtime();if(phase!=0||now-lastAttempt<4000)return;
+        reset();lastAttempt=now;pendingPackage=pkg;clickedKey=key;phase=1;wait.start(now);
+        if(confirmed)wait.confirm(now);
+        state(confirmed?"已识别未收藏→已收藏，准备取得原链接":"已识别收藏按钮，等待平台确认收藏成功");
+        handler.postDelayed(confirm,250);
     }
-    private AccessibilityNodeInfo root(){AccessibilityNodeInfo node=getRootInActiveWindow();return node!=null&&pendingPackage.equals(text(node.getPackageName()))?node:null;}
+    private void observe(String pkg){
+        if(phase!=0)return;
+        AccessibilityNodeInfo root=platformRoot(pkg);if(root==null)return;
+        Map<String,Boolean> states=new HashMap<>();
+        for(AccessibilityNodeInfo n:nodes(root))if(favoriteNode(n)){String key=nodeKey(n);states.put(key,Boolean.TRUE.equals(states.get(key))||selected(n));}
+        long now=SystemClock.elapsedRealtime();
+        String changed=transitions.update(scope(pkg,root.getWindowId()),states,now);
+        if(changed!=null&&now>=suppressUntil)startFavorite(pkg,changed,true);
+        else if(now-lastDiagnostic>15000){lastDiagnostic=now;state("服务运行中 · 当前可识别收藏控件 "+states.size()+" 个"+(states.isEmpty()?"；当前页面未提供可识别按钮，可使用分享→拾光":"；等待新增收藏"));}
+    }
+    private AccessibilityNodeInfo platformRoot(String pkg){
+        AccessibilityNodeInfo node=getRootInActiveWindow();
+        if(node!=null&&pkg.equals(text(node.getPackageName())))return node;
+        // App dialogs and share panels may be in a separate accessibility window.
+        for(AccessibilityWindowInfo window:getWindows())if(window.isActive()||window.isFocused()){
+            node=window.getRoot();if(node!=null&&pkg.equals(text(node.getPackageName())))return node;
+        }
+        return null;
+    }
+    private AccessibilityNodeInfo root(){return platformRoot(pendingPackage);}
     private List<AccessibilityNodeInfo> nodes(AccessibilityNodeInfo root){
         List<AccessibilityNodeInfo> result=new ArrayList<>();if(root==null)return result;
         ArrayDeque<AccessibilityNodeInfo> queue=new ArrayDeque<>();queue.add(root);
-        while(!queue.isEmpty()&&result.size()<400){AccessibilityNodeInfo n=queue.remove();result.add(n);for(int i=0;i<n.getChildCount()&&queue.size()<400;i++){AccessibilityNodeInfo child=n.getChild(i);if(child!=null&&child.isVisibleToUser()&&!child.isPassword()&&!child.isEditable())queue.add(child);}}
+        while(!queue.isEmpty()&&result.size()<800){AccessibilityNodeInfo n=queue.remove();result.add(n);for(int i=0;i<n.getChildCount()&&queue.size()<800;i++){AccessibilityNodeInfo child=n.getChild(i);if(child!=null&&child.isVisibleToUser()&&!child.isPassword()&&!child.isEditable())queue.add(child);}}
         return result;
     }
     private void confirmSaved(){
@@ -140,14 +192,31 @@ public class FavoriteCaptureService extends AccessibilityService {
                 if(!enabled(FavoriteCaptureService.this))return;
                 AccessibilityNodeInfo current=getRootInActiveWindow();if(current==null||!pkg.equals(text(current.getPackageName()))){fail("复制后已离开原平台，本次未保存");return;}
                 try{
-                    state("已点击复制链接，正在校验并打开分类窗口");startActivity(new Intent(FavoriteCaptureService.this,ClipboardCaptureActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("expectedPackage",pkg).putExtra("notBefore",timestamp));
-                    handler.postDelayed(()->{if(getPrefs(FavoriteCaptureService.this).getLong("launchAck",0)!=timestamp)fail("已取得复制动作，但系统未显示拾光窗口。请检查拾光的后台弹出界面权限；未保存。");else reset();},2500);
-                }catch(Exception e){fail("系统拒绝弹出拾光窗口，请检查后台弹出界面权限；未保存");}
+                    launchCapture(pkg,timestamp);
+                }catch(Exception e){offerCapture(pkg,timestamp);}
             },450);return;
         }
         if(SystemClock.elapsedRealtime()-copyStarted>3000){fail("未找到「复制链接」，本次未保存。请在分享菜单选择拾光。");return;}
         handler.postDelayed(this,250);
     }};
+    private void launchCapture(String pkg,long timestamp){
+        state("已复制原链接，正在打开分类窗口");
+        startActivity(new Intent(this,ClipboardCaptureActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("expectedPackage",pkg).putExtra("notBefore",timestamp));
+        handler.postDelayed(()->{if(getPrefs(this).getLong("launchAck",0)!=timestamp)offerCapture(pkg,timestamp);else reset();},2000);
+    }
+    private void offerCapture(String pkg,long timestamp){
+        if(!enabled(this)){reset();return;}
+        state("已取得复制动作；系统未弹出界面，请点屏幕下方「选择分类」继续");
+        if(prompt!=null)prompt.dismiss();
+        prompt=new FavoritePrompt(this);
+        boolean shown=prompt.show(()->{
+            handler.removeCallbacksAndMessages(null);
+            if(prompt!=null){prompt.dismiss();prompt=null;}
+            try{launchCapture(pkg,timestamp);}catch(Exception e){fail("系统仍未允许打开拾光，请在原内容使用分享→拾光；未保存");}
+        },()->{reset();state("已取消本次收藏跟随，未保存");});
+        if(!shown){fail("无法显示分类提示，请使用原内容的分享→拾光；未保存");return;}
+        handler.postDelayed(()->{reset();state("分类提示已超时，本次未保存");},45000);
+    }
     private void fail(String message){reset();state(message);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}
     @Override public void onInterrupt(){reset();state("服务被系统中断，请返回无障碍设置检查");}
     @Override public void onDestroy(){reset();if(instance==this)instance=null;super.onDestroy();}
