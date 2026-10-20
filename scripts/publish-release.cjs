@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.10\n\n抖音和YouTube收藏信息补全：提取分享文字中的标题；抖音读取原页面OG和RENDER_DATA中与原视频ID一致的标题、封面，避免误取推荐视频。YouTube保留oEmbed标题获取，标题单独返回、网络失败或超时时仍把原视频ID对应的封面写入收藏。\n\n保存时保留有效分享标题；重复收藏只补全缺失标题和封面，不覆盖分类、笔记和阅读状态。原有域名占位标题会在手机打开拾光时重试补全，随收藏同步到电脑。\n\n覆盖安装shiguang-android.apk，无需卸载。需原平台提供可读取的内容信息；平台登录/安全验证或网络限制时可能无法取得封面或标题。此次已通过自动化测试和APK构建，未在实体手机上验证。";
+ const notes="拾光 Android 1.6.11\n\n修复本机按钮适配：兼容旧记录，每个平台保留最多8种页面布局；普通版及极速版等同平台配置统一读取。资源ID匹配不再要求固定页面层级和6%位置误差，仍拒绝含糊/多个同分控件。\n\n优先识别收藏或保存，分享可作为独立备用触发入口，无需逐一配置。收藏已识别而分享入口无法读取时，不再要求重复适配；手动点原App分享后，验证复制链接菜单并自动记住入口。扩展YouTube保存按钮的英文无障碍标签及保存资源ID识别。\n\n覆盖安装，无需卸载。更新后关闭再开启收藏跟随的无障碍连接。保留已有记录。原App不暴露按钮或真实链接时仍可能无法自动完成，此版本未在实体手机验证。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:false})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();

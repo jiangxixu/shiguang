@@ -10,7 +10,7 @@ import java.util.*;
 /** Optional experimental workflow: favorite -> share -> copy link -> classification. */
 public class FavoriteCaptureService extends AccessibilityService {
     private final Handler handler=new Handler(Looper.getMainLooper());
-    private String pendingPackage="";
+    private String pendingPackage="",pendingShareRule="";
     private long lastAttempt,copyStarted;
     private String clickedKey="";
     private final FavoriteWait wait=new FavoriteWait();
@@ -49,7 +49,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     static boolean enabled(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getBoolean("enabled",false);}
     static void pause(Context c){c.getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();if(instance!=null){instance.reset();instance.disableSelf();}}
     @Override protected void onServiceConnected(){instance=this;state("服务已连接，等待已支持平台的收藏/保存操作");handler.post(sample);}
-    private void reset(){handler.removeCallbacksAndMessages(null);if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";clickedKey="";transitions.clear();scene.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;learningRole="";learningRule="";boundFavorite=null;}
+    private void reset(){handler.removeCallbacksAndMessages(null);if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";pendingShareRule="";clickedKey="";transitions.clear();scene.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;learningRole="";learningRule="";boundFavorite=null;}
     private String text(CharSequence value){return value==null?"":value.toString();}
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(!enabled(this)){reset();return;}
@@ -57,7 +57,14 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(phase==4){learnClick(event,pkg);return;}
         if(phase!=0&&!pkg.equals(pendingPackage)){fail("已切换平台，本次收藏跟随已取消，未保存");return;}
         long now=SystemClock.elapsedRealtime();
-        if(phase>=2)return;
+        if(phase==2){
+            // Learn a missing share entry from a user click only after Copy link appears.
+            if(copyTimeout==30000&&pkg.equals(pendingPackage)&&(event.getEventType()==AccessibilityEvent.TYPE_VIEW_CLICKED||event.getEventType()==AccessibilityEvent.TYPE_VIEW_LONG_CLICKED)){
+                AccessibilityNodeInfo target=event.getSource();if(target!=null){target=control(target);AccessibilityNodeInfo page=platformRoot(pkg);if(page!=null){String rule=FavoriteBindings.capture(page,target);if(rule!=null)pendingShareRule=rule;}}
+            }
+            return;
+        }
+        if(phase>=3)return;
         boolean click=event.getEventType()==AccessibilityEvent.TYPE_VIEW_CLICKED||event.getEventType()==AccessibilityEvent.TYPE_VIEW_LONG_CLICKED;
         if(click){lastClick=now;lastClickPackage=pkg;}
         boolean success=FavoriteRules.confirmedSuccess(text(event.getContentDescription()));
@@ -83,7 +90,13 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(click){
             AccessibilityNodeInfo source=event.getSource();
             if(source!=null&&(source.isPassword()||source.isEditable()))return;
+            // A user may use either entry; favorite/save always takes priority.
+            AccessibilityNodeInfo original=source;
             source=favoriteSource(source);
+            if(!favoriteNode(source)&&shareSource(original,pkg)&&now-lastAttempt>4000){
+                reset();lastAttempt=now;pendingPackage=pkg;phase=2;copyTimeout=8000;copyStarted=now;
+                state("已识别分享入口，等待原平台链接后打开分类窗口");handler.postDelayed(pollCopy,300);return;
+            }
             String label=text(event.getContentDescription());
             Boolean previous=source==null?null:transitions.previous(scope(pkg,source.getWindowId()),nodeKey(source),now);
             boolean newlySelected=source!=null&&Boolean.FALSE.equals(previous)&&selected(source);
@@ -135,6 +148,14 @@ public class FavoriteCaptureService extends AccessibilityService {
         for(int i=0;i<source.getChildCount()&&i<12;i++){AccessibilityNodeInfo child=source.getChild(i);if(child!=null&&!child.isPassword()&&!child.isEditable()&&child.isVisibleToUser()&&favoriteNode(child)){if(match!=null)return source;match=child;}}
         return match==null?source:match;
     }
+    private boolean shareSource(AccessibilityNodeInfo source,String pkg){
+        AccessibilityNodeInfo page=platformRoot(pkg),learned=FavoriteBindings.find(this,pkg,"share",page,nodes(page));
+        for(int depth=0;source!=null&&depth<3;depth++,source=source.getParent()){
+            if((learned!=null&&control(source).equals(learned))||FavoriteRules.share(text(source.getText()))||FavoriteRules.share(text(source.getContentDescription()))||FavoriteRules.roleId(pkg,source.getViewIdResourceName(),"share"))return true;
+            if(depth==0)for(int i=0;i<source.getChildCount()&&i<12;i++){AccessibilityNodeInfo child=source.getChild(i);if(child!=null&&(FavoriteRules.share(text(child.getText()))||FavoriteRules.share(text(child.getContentDescription()))))return true;}
+        }
+        return false;
+    }
     private String scope(String pkg,int window){return pkg+":"+window;}
     private void startFavorite(String pkg,String key,boolean confirmed){
         long now=SystemClock.elapsedRealtime();if(phase!=0||now-lastAttempt<4000)return;
@@ -154,7 +175,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         String changed=transitions.update(scope(pkg,root.getWindowId()),states,now);
         if(changed!=null&&now>=suppressUntil)startFavorite(pkg,changed,true);
         else {
-            String diagnostic=pkg+" · 可识别收藏控件 "+states.size()+" 个"+(states.isEmpty()?"；可到我→适配本机按钮记录收藏图标":"；等待新增收藏");
+            String diagnostic=pkg+" · 可识别收藏控件 "+states.size()+" 个"+(states.isEmpty()?(FavoriteBindings.configured(this,pkg,"favorite")?"；本机适配已保留，当前页面未匹配，可使用分享入口":"；当前页面未提供收藏/保存控件，可使用分享入口或首次适配"):"；等待新增收藏");
             if(!diagnostic.equals(lastDiagnosticText)&&now-lastDiagnostic>2000){lastDiagnostic=now;lastDiagnosticText=diagnostic;state(diagnostic);}
         }
     }
@@ -261,6 +282,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(phase!=2||!enabled(FavoriteCaptureService.this)){reset();return;}
         AccessibilityNodeInfo copy=button(true);
         if(copy!=null){
+            if(!pendingShareRule.isEmpty())FavoriteBindings.save(this,pendingPackage,"share",pendingShareRule);
             if(prompt!=null){prompt.dismiss();prompt=null;}
             String pkg=pendingPackage;long timestamp=System.currentTimeMillis();
             boolean clicked=clickNode(copy);
@@ -278,9 +300,9 @@ public class FavoriteCaptureService extends AccessibilityService {
     }};
     private void manualShare(){
         phase=2;copyStarted=SystemClock.elapsedRealtime();copyTimeout=30000;
-        state("已识别收藏，当前分享图标未适配；请点原App分享/更多，随后自动继续");
+        state("收藏/保存已识别，正在等待原App分享菜单；无需重新适配收藏按钮");
         String pkg=pendingPackage;prompt=new FavoritePrompt(this);
-        prompt.show("拾光 · 已识别收藏","请回到刚才收藏的原内容，点原 App 的分享或右上角 ⋯。出现复制链接后，拾光会继续打开分类窗口。也可记录这个分享图标，供下次自动使用。","记录分享按钮",()->startLearning(pkg,"share"),()->{reset();state("已取消，未保存");});
+        prompt.show("拾光 · 已识别收藏","请点原 App 的分享或右上角 ⋯。出现复制链接后会继续打开分类窗口，并自动记住这次分享入口。你之前的收藏/保存适配已保留，无需重复设置。","知道了",()->{if(prompt!=null){prompt.dismiss();prompt=null;}},()->{reset();state("已取消，未保存");});
         handler.postDelayed(pollCopy,300);
     }
     static boolean calibrate(String pkg,String role){if(instance==null||!enabled(instance))return false;instance.startLearning(pkg,role);return true;}
@@ -304,7 +326,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         pendingPackage=pkg;learningArmed=false;learningRule=rule;
         if(learningRole.equals("favorite")){
             FavoriteBindings.save(this,pkg,"favorite",rule);String key=nodeKey(target);reset();
-            state("已记录本机收藏按钮，等待平台确认本次收藏");startFavorite(pkg,key,false);return;
+            state("已永久记录本机收藏/保存按钮，后续无需重复适配");startFavorite(pkg,key,false);if(selected(target))wait.confirm(SystemClock.elapsedRealtime());return;
         }
         // A share binding is activated only after the menu exposes Copy link.
         handler.postDelayed(new Runnable(){final long until=SystemClock.elapsedRealtime()+5000;public void run(){

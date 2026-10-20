@@ -79,9 +79,9 @@ public class MainActivity extends Activity {
                         if(!FavoriteCaptureService.enabled(this)||!FavoriteCaptureService.active()){Toast.makeText(this,"请先开启收藏跟随并连接无障碍服务",Toast.LENGTH_LONG).show();return;}
                         new android.app.AlertDialog.Builder(this).setTitle("适配哪个平台？").setItems(FavoriteRules.PLATFORMS,(d,index)->{
                             String pkg=FavoriteRules.PACKAGES[index];
-                            new android.app.AlertDialog.Builder(this).setTitle("记录哪个按钮？").setMessage("随后打开该平台的内容详情页。按提示记录下一次点击；分享按钮需出现复制链接菜单才会生效。")
-                                .setPositiveButton("分享 / ⋯",(a,b)->FavoriteCaptureService.calibrate(pkg,"share"))
-                                .setNeutralButton("收藏 / 保存图标",(a,b)->FavoriteCaptureService.calibrate(pkg,"favorite"))
+                            new android.app.AlertDialog.Builder(this).setTitle("选择一个触发入口").setMessage("优先选择收藏/保存，只需记录一个按钮，不必把三个都配置。记录会长期保留；只有收藏按钮不可读取时，再选择分享作为备用入口。")
+                                .setNeutralButton("备用：分享 / ⋯",(a,b)->FavoriteCaptureService.calibrate(pkg,"share"))
+                                .setPositiveButton("优先：收藏 / 保存",(a,b)->FavoriteCaptureService.calibrate(pkg,"favorite"))
                                 .setNegativeButton("取消",null).show();
                         }).show();return;
                     }

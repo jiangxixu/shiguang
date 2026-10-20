@@ -26,27 +26,43 @@ final class FavoriteBindings {
             return value.toString();
         }catch(Exception e){return null;}
     }
+    private static String key(String pkg,String role){int index=FavoriteRules.platform(pkg);return (index>=0?FavoriteRules.PACKAGES[index]:pkg)+":"+role;}
+    private static JSONArray rules(Context c,String pkg,String role){
+        String raw=c.getSharedPreferences("favorite-bindings",Context.MODE_PRIVATE).getString(key(pkg,role),null);
+        if(raw==null)raw=c.getSharedPreferences("favorite-bindings",Context.MODE_PRIVATE).getString(pkg+":"+role,null);
+        try{if(raw!=null)return raw.trim().startsWith("[")?new JSONArray(raw):new JSONArray().put(new JSONObject(raw));}catch(Exception ignored){}
+        return new JSONArray();
+    }
+    static boolean configured(Context c,String pkg,String role){return rules(c,pkg,role).length()>0;}
     static void save(Context c,String pkg,String role,String rule){
-        c.getSharedPreferences("favorite-bindings",Context.MODE_PRIVATE).edit().putString(pkg+":"+role,rule).apply();
+        try{
+            JSONArray previous=rules(c,pkg,role),all=new JSONArray().put(new JSONObject(rule));
+            for(int i=0;i<previous.length()&&all.length()<8;i++)if(!previous.getJSONObject(i).toString().equals(rule))all.put(previous.getJSONObject(i));
+            c.getSharedPreferences("favorite-bindings",Context.MODE_PRIVATE).edit().putString(key(pkg,role),all.toString()).commit();
+        }catch(Exception ignored){}
     }
     static AccessibilityNodeInfo find(Context c,String pkg,String role,AccessibilityNodeInfo root,List<AccessibilityNodeInfo> nodes){
         if(root==null)return null;
-        try{
-            String raw=c.getSharedPreferences("favorite-bindings",Context.MODE_PRIVATE).getString(pkg+":"+role,null);if(raw==null)return null;
-            JSONObject rule=new JSONObject(raw);Rect screen=new Rect();root.getBoundsInScreen(screen);
-            if(screen.isEmpty()||rule.getBoolean("landscape")!=(screen.width()>screen.height())||!rule.getString("root").equals(String.valueOf(root.getClassName())))return null;
-            String id=rule.getString("id");AccessibilityNodeInfo target=null;
-            if(!id.isEmpty()){
-                for(AccessibilityNodeInfo n:nodes)if(id.equals(n.getViewIdResourceName())){if(target!=null)return null;target=n;}
-            }else{
-                target=root;JSONArray path=rule.getJSONArray("path");
-                for(int i=0;i<path.length()&&target!=null;i++){int index=path.getInt(i);target=index>=0&&index<target.getChildCount()?target.getChild(index):null;}
+        Rect screen=new Rect();root.getBoundsInScreen(screen);if(screen.isEmpty())return null;
+        JSONArray profiles=rules(c,pkg,role);AccessibilityNodeInfo best=null;int bestScore=-1,second=-1;
+        Map<AccessibilityNodeInfo,Integer> scores=new HashMap<>();
+        for(int i=0;i<profiles.length();i++)try{
+            JSONObject rule=profiles.getJSONObject(i);
+            if(rule.getBoolean("landscape")!=(screen.width()>screen.height()))continue;
+            AccessibilityNodeInfo pathTarget=root;JSONArray path=rule.getJSONArray("path");
+            for(int j=0;j<path.length()&&pathTarget!=null;j++){int index=path.getInt(j);pathTarget=index>=0&&index<pathTarget.getChildCount()?pathTarget.getChild(index):null;}
+            for(AccessibilityNodeInfo n:nodes){
+                if(!n.isVisibleToUser()||!n.isEnabled()||n.isEditable()||n.isPassword())continue;
+                Rect box=new Rect();n.getBoundsInScreen(box);
+                if(box.isEmpty()||box.width()>screen.width()*0.6||box.height()>screen.height()*0.25)continue;
+                double x=(box.exactCenterX()-screen.left)/screen.width(),y=(box.exactCenterY()-screen.top)/screen.height();
+                int score=FavoriteBindingMatch.score(rule.optString("id"),n.getViewIdResourceName(),rule.optString("class").equals(String.valueOf(n.getClassName())),n.equals(pathTarget),Math.abs(x-rule.getDouble("x")),Math.abs(y-rule.getDouble("y")));
+                if(score>=0)scores.put(n,Math.max(scores.getOrDefault(n,-1),score));
             }
-            if(target==null||!target.isVisibleToUser()||!target.isEnabled()||target.isEditable()||target.isPassword()||!rule.getString("class").equals(String.valueOf(target.getClassName())))return null;
-            Rect box=new Rect();target.getBoundsInScreen(box);
-            if(box.isEmpty()||box.width()>screen.width()*0.6||box.height()>screen.height()*0.25)return null;
-            float x=(box.exactCenterX()-screen.left)/screen.width(),y=(box.exactCenterY()-screen.top)/screen.height();
-            return Math.abs(x-rule.getDouble("x"))<=0.06&&Math.abs(y-rule.getDouble("y"))<=0.06?target:null;
-        }catch(Exception e){return null;}
+        }catch(Exception ignored){}
+        for(Map.Entry<AccessibilityNodeInfo,Integer> entry:scores.entrySet()){
+            int score=entry.getValue();if(score>bestScore){second=bestScore;bestScore=score;best=entry.getKey();}else second=Math.max(second,score);
+        }
+        return FavoriteBindingMatch.unique(bestScore,second)?best:null;
     }
 }

@@ -48,6 +48,10 @@ jobs:
           javac -d "$RUNNER_TEMP/favorite-test" android/app/src/main/java/io/github/jiangxixu/shiguang/CaptureClickBounds.java test/CaptureClickBoundsTest.java android/app/src/main/java/io/github/jiangxixu/shiguang/ContentPreviewUrls.java test/ContentPreviewUrlsTest.java
           java -cp "$RUNNER_TEMP/favorite-test" io.github.jiangxixu.shiguang.CaptureClickBoundsTest
           java -cp "$RUNNER_TEMP/favorite-test" io.github.jiangxixu.shiguang.ContentPreviewUrlsTest
+      - name: Check persistent favorite binding matching
+        run: |
+          javac -d "$RUNNER_TEMP/binding-test" android/app/src/main/java/io/github/jiangxixu/shiguang/FavoriteBindingMatch.java test/FavoriteBindingMatchTest.java
+          java -cp "$RUNNER_TEMP/binding-test" io.github.jiangxixu.shiguang.FavoriteBindingMatchTest
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.13'

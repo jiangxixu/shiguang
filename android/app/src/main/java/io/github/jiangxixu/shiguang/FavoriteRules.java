@@ -17,18 +17,18 @@ final class FavoriteRules {
     static String platformName(String pkg){int p=platform(pkg);return p<0?"原 App":PLATFORMS[p];}
     static boolean shareSheet(String pkg){return "android".equals(pkg)||"com.android.intentresolver".equals(pkg)||"com.google.android.intentresolver".equals(pkg);}
     static String clean(String s){return s==null?"":s.replaceAll("\\s+","").trim();}
-    private static String control(String label){return clean(label).replaceAll("[,，](?:按钮|未选中|已选中|双击激活|点按两次即可激活)","");}
-    static boolean favoriteButton(String label){String s=control(label);return s.matches("(?i)(?:收藏|收藏按钮|收藏此笔记|添加收藏|加入收藏|保存|保存到播放列表|保存至播放列表|稍后观看|加入稍后观看|儲存|儲存至播放清單|稍後觀看|Favorite|Save|Savetoplaylist|Savetowatchlater)(?:[,，:：]?\\d+(?:\\.\\d+)?[万千wWkK]?)?");}
+    private static String control(String label){return clean(label).replaceAll("[,，](?:按钮|未选中|已选中|双击激活|点按两次即可激活|(?i:button|notselected|selected|doubletaptoactivate))","");}
+    static boolean favoriteButton(String label){String s=control(label);return s.matches("(?i)(?:收藏|收藏按钮|收藏此笔记|添加收藏|加入收藏|保存|保存到播放列表|保存至播放列表|保存到稍后观看|保存视频|收藏视频|稍后观看|加入稍后观看|儲存|儲存至播放清單|稍後觀看|Favorite|Save|Savetoplaylist|Savevideotoplaylist|Savetowatchlater|AddtoWatchlater)(?:[,，:：]?\\d+(?:\\.\\d+)?[万千wWkK]?)?");}
     static boolean savedButton(String label){String s=control(label);return s.matches("(?i)(?:取消收藏|已收藏|已保存|已儲存|Saved|RemovefromWatchlater)(?:[,，:：]?\\d+(?:\\.\\d+)?[万千wWkK]?)?");}
     static boolean savedState(String label){return savedButton(label)||clean(label).matches("(?:已选中|已勾选|选中)")||clean(label).matches(".*[,，](?:已选中|已勾选)(?:[,，].*)?");}
-    static boolean success(String label){String s=clean(label);return s.matches("(?:收藏成功|已收藏|已添加到收藏夹|成功添加到收藏夹|保存成功)[!！。]?")||s.matches("(?i)(?:已保存到|已保存至|已儲存至|Savedto|Addedto).{1,100}");}
+    static boolean success(String label){String s=clean(label);return s.matches("(?:收藏成功|已收藏|已添加到收藏夹|成功添加到收藏夹|保存成功|已添加至稍后观看)[!！。]?")||s.matches("(?i)(?:已保存到|已保存至|已儲存至|Savedto|Addedto).{1,100}");}
     static boolean copy(String label){String s=control(label);return s.equals("复制链接")||s.equals("复制链接按钮")||s.equals("复制笔记链接")||s.equals("拷贝链接")||s.equals("複製連結")||s.equalsIgnoreCase("Copylink");}
     static boolean systemCopy(String label){String s=control(label);return copy(label)||s.equals("复制")||s.equalsIgnoreCase("Copy");}
-    static boolean share(String label){String s=control(label);return s.equals("分享")||s.equals("分享按钮")||s.equals("分享笔记")||s.equals("分享视频")||s.equals("分享回答")||s.equals("分享文章")||s.equals("共享")||s.equalsIgnoreCase("Share");}
+    static boolean share(String label){String s=control(label);return s.equals("分享")||s.equals("分享按钮")||s.equals("分享笔记")||s.equals("分享视频")||s.equals("分享回答")||s.equals("分享文章")||s.equals("共享")||s.equalsIgnoreCase("Share")||s.equalsIgnoreCase("Sharevideo");}
     static boolean roleId(String pkg,String id,String role){
         if(!supported(pkg)||id==null||!id.startsWith(pkg+":id/"))return false;
         String tail=id.substring((pkg+":id/").length());
-        String name=role.equals("favorite")?"(?:favorite|favourite|favor|fav|collect|collection)":role.equals("share")?"(?:share|sharing|forward)":"(?:copy_link|copylink|link_copy)";
+        String name=role.equals("favorite")?"(?:favorite|favourite|favor|fav|collect|collection|save|save_to_playlist|watch_later)":role.equals("share")?"(?:share|sharing|forward)":"(?:copy_link|copylink|link_copy)";
         return tail.matches("(?i)(?:(?:btn|button|iv|tv|img|image|icon|frame|action|layout|ll|rl)_)*"+name+"(?:_(?:btn|button|icon|view|layout|container))?");
     }
     static boolean confirmedSuccess(String label){return success(label)&&!clean(label).equals("已收藏");}

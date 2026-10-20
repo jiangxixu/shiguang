@@ -45,6 +45,10 @@ public class FavoriteRulesTest {
         check(FavoriteRules.contentUrl(douyin,"https://www.douyin.com/?modal_id=123456"));
         check(!FavoriteRules.contentUrl(douyin,"https://www.douyin.com/?modal_id=abc"));
         check(!FavoriteRules.contentUrl(douyin,"https://www.douyin.com/user/123?modal_id=456"));
+        for(String label:new String[]{"Save, button","Save to playlist, button","Save video to playlist","Add to Watch later","收藏视频","保存到稍后观看"})check(FavoriteRules.favoriteButton(label));
+        check(FavoriteRules.share("Share video, button"));
+        check(FavoriteRules.roleId(youtube,"com.google.android.youtube:id/save_to_playlist","favorite"));
+        check(!FavoriteRules.favoriteButton("下载视频"));check(!FavoriteRules.favoriteButton("Save image"));
         System.out.println("Favorite/cancel distinction and real platform-content URL validation passed.");
     }
 }
