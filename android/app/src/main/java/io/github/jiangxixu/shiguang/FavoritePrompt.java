@@ -13,7 +13,7 @@ final class FavoritePrompt {
     private View view;
     FavoritePrompt(AccessibilityService service){this.service=service;}
     boolean show(Runnable open,Runnable cancel){
-        return show("拾光 · 已检测到收藏","系统未自动打开窗口。点击选择分类后，校验原链接；确认保存才会加入拾光。","选择分类",open,cancel);
+        return show("拾光 · 已检测到收藏","尚未收到窗口打开回执。点击选择分类继续校验原链接；确认保存后加入拾光。","选择分类",open,cancel);
     }
     boolean show(String heading,String description,String action,Runnable open,Runnable cancel){
         LinearLayout card=new LinearLayout(service);card.setOrientation(LinearLayout.VERTICAL);

@@ -55,6 +55,10 @@ public class FavoriteRulesTest {
         for(String pkg:FavoriteRules.PACKAGES)check(FavoriteRules.copyForPlatform(pkg,"复制链接"));
         for(String label:new String[]{"分享","分享给","分享给好友","分享链接到微信","复制文案","保存视频"})check(!FavoriteRules.copyForPlatform(douyin,label));
         check(!FavoriteRules.copy("分享链接"));check(!FavoriteRules.systemCopy("分享链接"));
+        check(FavoriteRules.favoriteButton("存入播放列表"));check(FavoriteRules.favoriteButton("加入播放列表"));
+        check(FavoriteRules.pendingSuccess(youtube,"Saved"));check(FavoriteRules.pendingSuccess(youtube,"已保存"));
+        check(!FavoriteRules.confirmedSuccess("Saved"));check(!FavoriteRules.pendingSuccess(youtube,"Save"));
+        check(!FavoriteRules.pendingSuccess(youtube,"已从播放列表移除"));check(!FavoriteRules.pendingSuccess(douyin,"Saved"));
         System.out.println("Favorite/cancel distinction and real platform-content URL validation passed.");
     }
 }

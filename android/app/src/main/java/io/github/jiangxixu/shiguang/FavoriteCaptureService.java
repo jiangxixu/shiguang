@@ -18,6 +18,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     private int phase; // 0 idle, 1 waiting for favorite success, 2 locating copy-link action
     private final FavoriteTransitions transitions=new FavoriteTransitions();
     private FavoritePrompt prompt;
+    private FavoriteCaptureOverlay captureOverlay;
     private String observedPackage="";
     private long suppressUntil;
     private long lastObserved,lastDiagnostic,lastClick;
@@ -49,7 +50,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     static boolean enabled(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getBoolean("enabled",false);}
     static void pause(Context c){c.getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();if(instance!=null){instance.reset();instance.disableSelf();}}
     @Override protected void onServiceConnected(){instance=this;state("服务已连接，等待已支持平台的收藏/保存操作");handler.post(sample);}
-    private void reset(){handler.removeCallbacksAndMessages(null);if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;learningRole="";learningRule="";boundFavorite=null;}
+    private void reset(){handler.removeCallbacksAndMessages(null);if(captureOverlay!=null){captureOverlay.dismiss();captureOverlay=null;}if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;learningRole="";learningRule="";boundFavorite=null;}
     private String text(CharSequence value){return value==null?"":value.toString();}
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(!enabled(this)){reset();return;}
@@ -116,8 +117,8 @@ public class FavoriteCaptureService extends AccessibilityService {
             }else if(phase==0){observe(pkg);}
         }
         if(phase==1){
-            boolean saved=FavoriteRules.success(text(event.getContentDescription()));
-            for(CharSequence t:event.getText())saved|=FavoriteRules.success(text(t));
+            boolean saved=FavoriteRules.pendingSuccess(pkg,text(event.getContentDescription()));
+            for(CharSequence t:event.getText())saved|=FavoriteRules.pendingSuccess(pkg,text(t));
             if(saved)wait.confirm(now);
         }
     }
@@ -379,9 +380,19 @@ public class FavoriteCaptureService extends AccessibilityService {
         }},250);
     }
     private void launchCapture(String pkg,long timestamp){
-        state("已复制原链接，正在打开分类窗口");
+        if(captureOverlay!=null)return;
+        state("已执行取链接动作，正在当前页面打开分类表单");
+        captureOverlay=new FavoriteCaptureOverlay(this,message->{reset();state(message);Toast.makeText(this,message,Toast.LENGTH_SHORT).show();},()->{
+            captureOverlay=null;
+            try{launchCaptureActivity(pkg,timestamp);}catch(Exception e){offerCapture(pkg,timestamp);}
+        });
+        if(captureOverlay.show(pkg,timestamp,pendingTitle))return;
+        captureOverlay=null;launchCaptureActivity(pkg,timestamp);
+    }
+    private void launchCaptureActivity(String pkg,long timestamp){
+        state("正在打开拾光链接校验窗口");
         startActivity(new Intent(this,ClipboardCaptureActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("expectedPackage",pkg).putExtra("notBefore",timestamp).putExtra("capturedTitle",pendingTitle));
-        handler.postDelayed(()->{if(getPrefs(this).getLong("launchAck",0)!=timestamp)offerCapture(pkg,timestamp);else reset();},2000);
+        handler.postDelayed(()->{if(getPrefs(this).getLong("launchAck",0)!=timestamp)offerCapture(pkg,timestamp);else reset();},4000);
     }
     private void offerCapture(String pkg,long timestamp){
         if(!enabled(this)){reset();return;}
@@ -391,7 +402,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         boolean shown=prompt.show(()->{
             handler.removeCallbacksAndMessages(null);
             if(prompt!=null){prompt.dismiss();prompt=null;}
-            try{launchCapture(pkg,timestamp);}catch(Exception e){fail("系统仍未允许打开拾光，请在原内容使用分享→拾光；未保存");}
+            try{launchCaptureActivity(pkg,timestamp);}catch(Exception e){fail("系统仍未允许打开拾光，请在原内容使用分享→拾光；未保存");}
         },()->{reset();state("已取消本次收藏跟随，未保存");});
         if(!shown){fail("无法显示分类提示，请使用原内容的分享→拾光；未保存");return;}
         handler.postDelayed(()->{reset();state("分类提示已超时，本次未保存");},45000);

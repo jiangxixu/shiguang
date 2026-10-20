@@ -56,6 +56,10 @@ jobs:
         run: |
           javac -d "$RUNNER_TEMP/zhihu-test" android/app/src/main/java/io/github/jiangxixu/shiguang/ZhihuPageRules.java test/ZhihuPageRulesTest.java
           java -cp "$RUNNER_TEMP/zhihu-test" io.github.jiangxixu.shiguang.ZhihuPageRulesTest
+      - name: Check capture link freshness and source binding
+        run: |
+          javac -d "$RUNNER_TEMP/capture-test" android/app/src/main/java/io/github/jiangxixu/shiguang/{CapturedLink,ShareLinks,PlatformLinks,XhsLinks,FavoriteRules,ZhihuPageRules}.java test/CapturedLinkTest.java
+          java -cp "$RUNNER_TEMP/capture-test" io.github.jiangxixu.shiguang.CapturedLinkTest
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.13'

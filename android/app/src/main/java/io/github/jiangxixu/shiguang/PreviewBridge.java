@@ -165,13 +165,13 @@ final class PreviewBridge {
         }
         return new JSONObject();
     }
-    static void install(Activity activity,WebView web) {
+    static void install(android.content.Context activity,WebView web) {
         if(!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))return;
         WebViewCompat.addWebMessageListener(web,"ShiguangPreviewNative",Collections.singleton("https://appassets.androidplatform.net"),(v,message,origin,main,reply)->{
             if(!main||!"https://appassets.androidplatform.net".equals(origin.toString()))return;
             try{String raw=message.getData();if(raw==null||raw.length()>3000)return;JSONObject input=new JSONObject(raw);String id=input.getString("id"),url=input.getString("url");
                 boolean xhsSession=XhsMetadataLoginActivity.enabled(activity);
-                new Thread(()->{JSONObject result=fetch(url,xhsSession);try{result.put("id",id);}catch(Exception ignored){}activity.runOnUiThread(()->{if(!activity.isFinishing()&&!activity.isDestroyed())reply.postMessage(result.toString());});},"shiguang-preview").start();
+                new Thread(()->{JSONObject result=fetch(url,xhsSession);try{result.put("id",id);}catch(Exception ignored){}new android.os.Handler(android.os.Looper.getMainLooper()).post(()->{if(web.isAttachedToWindow()&&(!(activity instanceof Activity)||(!((Activity)activity).isFinishing()&&!((Activity)activity).isDestroyed())))try{reply.postMessage(result.toString());}catch(Exception ignored){}});},"shiguang-preview").start();
             }catch(Exception ignored){}
         });
     }
