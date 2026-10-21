@@ -41,6 +41,13 @@ public class FavoriteTransitionsTest {
         t.interact("xhs:window1","unrelated-like-button",11050);
         check(t.update("xhs:window1",state(true),11100)==null); // unrelated click is not proof
         check(t.update("xhs:window1",state(true),12000)==null); // pending change expires
+        t.clear();t.update("youtube:window1",state(false),13000);
+        t.interact("youtube:window1","footer:favorite",13010);
+        t.clear(); // ordinary share discards the preceding interaction
+        check(t.update("youtube:window1",state(true),13020)==null);
+        t.update("youtube:window1",state(false),14000);
+        t.interact("youtube:window1","footer:favorite",14010);
+        check("footer:favorite".equals(t.update("youtube:window1",state(true),14020))); // future save still works
         System.out.println("Favorite transitions: missing click, duplicate, cancel, stale page, platform/window switch and feed isolation passed.");
     }
 }
