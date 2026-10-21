@@ -21,14 +21,12 @@ public class MainActivity extends Activity {
     private static final String ORIGIN = "https://appassets.androidplatform.net";
     private static final String HOME = ORIGIN + "/assets/index.html";
     private WebView web;
-    private boolean awaitingOverlayPermission;
     private ValueCallback<Uri[]> fileCallback;
     private byte[] pendingExport;
     private boolean openingXhs;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        awaitingOverlayPermission=state!=null&&state.getBoolean("awaitingOverlayPermission",false);
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setBackgroundColor(Color.rgb(246,245,240));
@@ -92,11 +90,6 @@ public class MainActivity extends Activity {
                     if("enableAutoCapture".equals(action)){enableAutoCapture();return;}
                     if("disableAutoCapture".equals(action)){FavoriteCaptureService.pause(this);updateAutoState();Toast.makeText(this,"自动跟随收藏已关闭",Toast.LENGTH_SHORT).show();return;}
                     if("openLink".equals(action)){external(Uri.parse(data.optString("url")));return;}
-                    if("enableFloating".equals(action)){enableFloating();return;}
-                    if("disableFloating".equals(action)){stopService(new Intent(this,FloatingCaptureService.class));Toast.makeText(this,"悬浮收藏已关闭",Toast.LENGTH_SHORT).show();return;}
-                    if("captureClipboard".equals(action)){startActivity(new Intent(this,ClipboardCaptureActivity.class));return;}
-                    if("pinCapture".equals(action)){ShareTargets.pin(this);return;}
-                    if("addCaptureTile".equals(action)){addCaptureTile();return;}
                     String name=data.getString("name");
                     if(!name.matches("[^/\\\\]{1,120}\\.(json|csv)"))throw new Exception();
                     if(pendingExport!=null){Toast.makeText(this,"请先完成上一次文件保存",Toast.LENGTH_SHORT).show();return;}
@@ -119,41 +112,10 @@ public class MainActivity extends Activity {
         new android.app.AlertDialog.Builder(this).setTitle("启用收藏跟随（试用）")
             .setMessage("支持尝试适配小红书、B站、知乎、抖音（含极速版）、YouTube 的可识别按钮。YouTube 对应保存到播放列表或稍后观看。允许拾光在这些 App 的前台页面本地比较收藏前后的按钮状态；确认新增收藏后，尝试自动打开分享菜单并点击复制链接，再弹出分类窗口。系统拦截弹窗时，显示可点击的「选择分类」提示。只有你确认保存，原链接及填写的信息才会同步。\n\n不读取密码、不上传页面树，不操作点赞或取消收藏。没有取得新原链接就不保存。不同版本可能无法识别，尚未在你的手机验证。可随时关闭。")
             .setNegativeButton("暂不开启",null).setPositiveButton("同意并前往系统开启",(dialog,which)->{
-                stopService(new Intent(this,FloatingCaptureService.class));
                 getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",true).apply();
                 try{startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));}
                 catch(Exception e){Toast.makeText(this,"请到系统设置 → 无障碍，开启「拾光 · 收藏跟随（试用）」",Toast.LENGTH_LONG).show();}
             }).show();
-    }
-    private void enableFloating(){
-        if(android.provider.Settings.canDrawOverlays(this)){startFloating();return;}
-        new android.app.AlertDialog.Builder(this).setTitle("开启悬浮收藏")
-            .setMessage("请在下一页为拾光允许「显示在其他应用上层」。开启后：复制链接 → 点悬浮球 → 分类保存。拖到左右边缘可收起，长按可关闭。不会后台读取剪贴板。")
-            .setNegativeButton("暂不开启",null).setPositiveButton("前往允许",(dialog,which)->{
-                awaitingOverlayPermission=true;
-                try{startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}
-                catch(Exception e){awaitingOverlayPermission=false;Toast.makeText(this,"请到系统设置 → 应用 → 拾光，允许显示在其他应用上层",Toast.LENGTH_LONG).show();}
-            }).show();
-    }
-    private void startFloating(){
-        try{
-            if(android.os.Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)
-                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},12);
-            startForegroundService(new Intent(this,FloatingCaptureService.class));
-            Toast.makeText(this,"悬浮球已开启：拖到边缘收起，点把手展开，长按关闭",Toast.LENGTH_LONG).show();
-        }catch(Exception e){Toast.makeText(this,"开启失败，请检查悬浮窗权限后重试",Toast.LENGTH_LONG).show();}
-    }
-    @Override protected void onSaveInstanceState(Bundle state){state.putBoolean("awaitingOverlayPermission",awaitingOverlayPermission);super.onSaveInstanceState(state);}
-    private void addCaptureTile(){
-        if(android.os.Build.VERSION.SDK_INT>=33){
-            try{
-                getSystemService(android.app.StatusBarManager.class).requestAddTileService(new android.content.ComponentName(this,CaptureTileService.class),"拾光收藏",android.graphics.drawable.Icon.createWithResource(this,R.drawable.ic_capture_tile),getMainExecutor(),result->{
-                    boolean added=result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED||result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED;
-                    Toast.makeText(this,added?"已添加：复制链接后，下拉点「拾光收藏」":"未添加。可下拉两次 → 编辑按钮 → 拖入「拾光收藏」",Toast.LENGTH_LONG).show();
-                });return;
-            }catch(Exception ignored){}
-        }
-        new android.app.AlertDialog.Builder(this).setTitle("添加拾光收藏按钮").setMessage("从屏幕顶部下拉两次，点击编辑按钮（铅笔或更多），找到「拾光收藏」并拖到常用区域。以后复制链接，下拉点它即可选择分类并收藏。").setPositiveButton("知道了",null).show();
     }
     private boolean isLocal(Uri u){return "https".equals(u.getScheme())&&"appassets.androidplatform.net".equals(u.getHost());}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
@@ -196,7 +158,7 @@ public class MainActivity extends Activity {
         if(request==10&&fileCallback!=null){fileCallback.onReceiveValue(result==RESULT_OK&&data!=null&&data.getData()!=null?new Uri[]{data.getData()}:null);fileCallback=null;}
         if(request==11){byte[] bytes=pendingExport;pendingExport=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null&&bytes!=null){try(OutputStream out=getContentResolver().openOutputStream(data.getData())){if(out==null)throw new Exception();out.write(bytes);Toast.makeText(this,"备份已保存",Toast.LENGTH_SHORT).show();}catch(Exception e){Toast.makeText(this,"保存失败，请重试导出备份",Toast.LENGTH_LONG).show();}}}
     }
-    @Override protected void onResume(){super.onResume();if(awaitingOverlayPermission){awaitingOverlayPermission=false;if(android.provider.Settings.canDrawOverlays(this))startFloating();else Toast.makeText(this,"尚未允许悬浮窗，可在「我」中重新开启",Toast.LENGTH_LONG).show();}if(web!=null)updateAutoState();if(web!=null)web.evaluateJavascript("window.dispatchEvent(new Event('shiguang-refresh'));window.ShiguangCloud?.schedule()",null);}
+    @Override protected void onResume(){super.onResume();if(web!=null)updateAutoState();if(web!=null)web.evaluateJavascript("window.dispatchEvent(new Event('shiguang-refresh'));window.ShiguangCloud?.schedule()",null);}
     @Override public void onBackPressed(){if(web.canGoBack())web.goBack();else super.onBackPressed();}
     @Override protected void onDestroy(){if(fileCallback!=null)fileCallback.onReceiveValue(null);web.destroy();super.onDestroy();}
 }

@@ -24,10 +24,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Check overlay drag and docking geometry
-        run: |
-          javac -d "$RUNNER_TEMP/overlay-test" android/app/src/main/java/io/github/jiangxixu/shiguang/OverlayGeometry.java test/OverlayGeometryTest.java
-          java -cp "$RUNNER_TEMP/overlay-test" io.github.jiangxixu.shiguang.OverlayGeometryTest
       - name: Check app-first link routing
         run: |
           javac -d "$RUNNER_TEMP/link-test" android/app/src/main/java/io/github/jiangxixu/shiguang/PlatformLinks.java android/app/src/main/java/io/github/jiangxixu/shiguang/XhsLinks.java android/app/src/main/java/io/github/jiangxixu/shiguang/ShareLinks.java test/PlatformLinksTest.java test/ShareLinksTest.java
