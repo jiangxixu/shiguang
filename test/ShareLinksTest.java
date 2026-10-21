@@ -24,6 +24,8 @@ public class ShareLinksTest {
         check(ShareLinks.sharedTitle("问题标题\nhttps://zhihu.link/abc").equals("问题标题"));
         check(ShareLinks.sharedTitle("https://zhihu.link/abc").isEmpty());
         check(ShareLinks.sharedTitle("3.14 学会机器人控制 #机器人 https://v.douyin.com/abc/ 复制此链接，打开抖音").equals("学会机器人控制 #机器人"));
+        check(ShareLinks.sharedTitle("7.12 复制打开抖音，看看【医路向前巍子的作品】记住这四点，能让您比同龄人更年轻# 抖出健康知识宝... https://v.douyin.com/SqkJeQAhshc/ :7pm l@C.hO 06/27 Mjp:/").equals("记住这四点，能让您比同龄人更年轻# 抖出健康知识宝..."));
+        check(ShareLinks.sharedTitle("7.12 复制打开抖音，看看【医路向前巍子的作品】 https://v.douyin.com/SqkJeQAhshc/").isEmpty());
         check(ShareLinks.sharedTitle("复制此链接，打开抖音 https://v.douyin.com/abc/").isEmpty());
         check(ShareLinks.sharedTitle("Learning robotics - YouTube\nhttps://youtu.be/AbC123_-xyZ").equals("Learning robotics"));
         check(ShareLinks.sharedTitle("https://youtu.be/AbC123_-xyZ").isEmpty());

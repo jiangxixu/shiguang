@@ -49,6 +49,15 @@ final class ShareLinks {
         }
         if(links.size()==1&&(platformName(links.get(0)).equals("抖音")||platformName(links.get(0)).equals("YouTube"))){
             Matcher link=LINK.matcher(text);String prefix=link.find()?text.substring(0,link.start()).trim():"";
+            if(platformName(links.get(0)).equals("抖音")){
+                // The caption follows the author wrapper; keep its actual text, including
+                // any ellipsis supplied by the platform, rather than dropping the whole invitation.
+                Matcher caption=Pattern.compile("^(?:\\d+(?:\\.\\d+)?\\s+)?(?:复制)?打开抖音[，,]?\\s*(?:看看|查看)【[^【】\\r\\n]{1,100}的作品】\\s*(.+)$",Pattern.DOTALL).matcher(prefix);
+                if(caption.matches()){
+                    String value=caption.group(1).trim();
+                    if(value.length()>=2&&value.length()<=500)return value;
+                }
+            }
             // Douyin's copied prose includes a share counter and trailing invitation.
             prefix=prefix.replaceFirst("^\\d+(?:\\.\\d+)?\\s+", "").replaceFirst("\\s*复制(?:此|这|本)条.*$", "").trim();
             for(String line:prefix.split("[\\r\\n]+")){

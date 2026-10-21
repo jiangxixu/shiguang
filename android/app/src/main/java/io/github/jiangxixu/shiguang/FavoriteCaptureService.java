@@ -15,6 +15,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     private String clickedKey="";
     private final FavoriteWait wait=new FavoriteWait();
     private final FavoriteScene scene=new FavoriteScene();
+    private final MenuOrigin menuOrigin=new MenuOrigin();
     private int phase; // 0 idle, 1 waiting for favorite success, 2 locating copy-link action
     private final FavoriteTransitions transitions=new FavoriteTransitions();
     private FavoritePrompt prompt;
@@ -30,7 +31,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(!enabled(FavoriteCaptureService.this)||phase!=0)return;
         AccessibilityNodeInfo root=getRootInActiveWindow();
         String pkg=root==null?"":text(root.getPackageName());
-        if(!FavoriteRules.supported(pkg)){transitions.clear();observedPackage="";handler.postDelayed(this,1000);return;}
+        if(!FavoriteRules.supported(pkg)){transitions.clear();menuOrigin.clear();observedPackage="";handler.postDelayed(this,1000);return;}
         observe(pkg);
         if(phase==0)handler.postDelayed(this,500);
     }};
@@ -54,7 +55,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     static boolean enabled(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getBoolean("enabled",false);}
     static void pause(Context c){c.getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();if(instance!=null){instance.reset();instance.disableSelf();}}
     @Override protected void onServiceConnected(){instance=this;state("服务已连接，等待已支持平台的收藏/保存操作");handler.post(sample);}
-    private void reset(){handler.removeCallbacksAndMessages(null);if(captureOverlay!=null){captureOverlay.dismiss();captureOverlay=null;}if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;learningRole="";learningRule="";boundFavorite=null;if(instance==this&&enabled(this))handler.postDelayed(sample,200);}
+    private void reset(){handler.removeCallbacksAndMessages(null);if(captureOverlay!=null){captureOverlay.dismiss();captureOverlay=null;}if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();menuOrigin.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;learningRole="";learningRule="";boundFavorite=null;if(instance==this&&enabled(this))handler.postDelayed(sample,200);}
     private String text(CharSequence value){return value==null?"":value.toString();}
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(!enabled(this)){reset();return;}
@@ -71,16 +72,23 @@ public class FavoriteCaptureService extends AccessibilityService {
         }
         if(phase>=3)return;
         boolean click=event.getEventType()==AccessibilityEvent.TYPE_VIEW_CLICKED||event.getEventType()==AccessibilityEvent.TYPE_VIEW_LONG_CLICKED;
-        if(click){lastClick=now;lastClickPackage=pkg;}
+        if(click){
+            lastClick=now;lastClickPackage=pkg;
+            if(phase==0&&"com.google.android.youtube".equals(pkg)){
+                AccessibilityNodeInfo clicked=event.getSource();
+                if(youtubeOverflow(clicked))menuOrigin.open(pkg,clicked.getWindowId(),now);
+            }
+        }
         boolean success=FavoriteRules.confirmedSuccess(text(event.getContentDescription()));
         for(CharSequence value:event.getText())success|=FavoriteRules.confirmedSuccess(text(value));
         if(phase==0&&success&&pkg.equals(lastClickPackage)&&now-lastClick<6000){startFavorite(pkg,"",true);return;}
         if(event.getEventType()==AccessibilityEvent.TYPE_VIEW_SCROLLED){
             if(phase==1){if(!scrollMessageSent){scrollMessageSent=true;state("检测到滚动或收藏夹布局变化，继续等待收藏确认及原内容返回");}return;}
+            if(menuOrigin.source(pkg,now)==null)menuOrigin.clear();
             transitions.clear();suppressUntil=now+700;return;
         }
         if(phase==0){
-            if(!pkg.equals(observedPackage)){transitions.clear();observedPackage=pkg;handler.removeCallbacks(sample);handler.post(sample);}
+            if(!pkg.equals(observedPackage)){transitions.clear();if(!observedPackage.isEmpty())menuOrigin.clear();observedPackage=pkg;handler.removeCallbacks(sample);handler.post(sample);}
             int type=event.getEventType();
             AccessibilityNodeInfo current=platformRoot(pkg);
             if(current!=null){
@@ -136,7 +144,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         for(int i=0;i<6;i++){
             parent=parent.getParent();if(parent==null||parent.isEditable()||parent.isPassword())break;
             android.graphics.Rect bounds=new android.graphics.Rect();parent.getBoundsInScreen(bounds);
-            if(parent.isClickable()&&bounds.width()<=getResources().getDisplayMetrics().widthPixels/2&&bounds.height()<=100*getResources().getDisplayMetrics().density)return parent;
+            if(parent.isClickable()&&bounds.width()<=getResources().getDisplayMetrics().widthPixels&&bounds.height()<=96*getResources().getDisplayMetrics().density)return parent;
         }
         return n;
     }
@@ -159,7 +167,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     }
     private boolean compact(AccessibilityNodeInfo node){
         if(node==null)return false;android.graphics.Rect r=new android.graphics.Rect();node.getBoundsInScreen(r);
-        android.util.DisplayMetrics m=getResources().getDisplayMetrics();return !r.isEmpty()&&r.width()<=m.widthPixels*.8&&r.height()<=m.density*120;
+        android.util.DisplayMetrics m=getResources().getDisplayMetrics();return MenuActions.compact(r.width(),r.height(),m.widthPixels,m.density);
     }
     private boolean shareSource(AccessibilityNodeInfo source,String pkg){
         AccessibilityNodeInfo page=platformRoot(pkg),learned=FavoriteBindings.find(this,pkg,"share",page,nodes(page));
@@ -172,8 +180,11 @@ public class FavoriteCaptureService extends AccessibilityService {
     private String scope(String pkg,int window){return pkg+":"+window;}
     private void startFavorite(String pkg,String key,boolean confirmed){
         long now=SystemClock.elapsedRealtime();if(phase!=0||now-lastAttempt<4000)return;
+        MenuOrigin.Source origin=menuOrigin.source(pkg,now);
         reset();lastAttempt=now;pendingPackage=pkg;clickedKey=key;phase=1;wait.start(now);
-        AccessibilityNodeInfo page=platformRoot(pkg);pendingTitle=sourceTitle(page);scene.start(page==null?-1:page.getWindowId(),sceneText(page),now);
+        AccessibilityNodeInfo page=platformRoot(pkg);pendingTitle=origin==null?sourceTitle(page):origin.title;
+        scene.start(origin==null?(page==null?-1:page.getWindowId()):origin.window,origin==null?sceneText(page):origin.anchor,now);
+        if(origin!=null)state("已识别菜单中的保存，保留原视频信息并等待平台确认");
         if(confirmed)wait.confirm(now);
         state(confirmed?"已识别未收藏→已收藏，准备取得原链接":"已识别收藏按钮，等待平台确认收藏成功");
         handler.postDelayed(confirm,250);
@@ -181,6 +192,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     private void observe(String pkg){
         if(phase!=0)return;
         AccessibilityNodeInfo root=platformRoot(pkg);if(root==null)return;
+        if("com.google.android.youtube".equals(pkg))menuOrigin.observe(pkg,root.getWindowId(),sourceTitle(root),sceneText(root),SystemClock.elapsedRealtime());
         boundFavorite=FavoriteBindings.find(this,pkg,"favorite",root,nodes(root));
         Map<String,Boolean> states=new HashMap<>();
         for(AccessibilityNodeInfo n:nodes(root))if(favoriteNode(n)){String key=nodeKey(n);states.put(key,Boolean.TRUE.equals(states.get(key))||selected(n));}
@@ -217,12 +229,31 @@ public class FavoriteCaptureService extends AccessibilityService {
     private String sourceTitle(AccessibilityNodeInfo page){
         if(page==null)return "";String pkg=text(page.getPackageName());
         if(pkg.equals("com.zhihu.android"))return zhihuTitle(page);
-        String unique="";
+        String unique="";android.graphics.Rect screen=new android.graphics.Rect();page.getBoundsInScreen(screen);
         for(AccessibilityNodeInfo n:nodes(page))if(PageTitles.titleId(pkg,n.getViewIdResourceName())){
+            android.graphics.Rect box=new android.graphics.Rect();n.getBoundsInScreen(box);
+            if("com.google.android.youtube".equals(pkg)&&!screen.isEmpty()&&box.top>screen.top+screen.height()*.60)continue;
             String value=PageTitles.clean(text(n.getText()));if(value.isEmpty())value=PageTitles.clean(text(n.getContentDescription()));
             if(value.isEmpty())continue;if(!unique.isEmpty()&&!unique.equals(value))return "";unique=value;
         }
+        if(unique.isEmpty()&&FavoriteRules.platform(pkg)==3&&!screen.isEmpty()){
+            List<DouyinCaption.Text> captions=new ArrayList<>();
+            for(AccessibilityNodeInfo n:nodes(page))if("android.widget.TextView".equals(text(n.getClassName()))){
+                android.graphics.Rect box=new android.graphics.Rect();n.getBoundsInScreen(box);
+                captions.add(new DouyinCaption.Text(text(n.getText()),(double)(box.left-screen.left)/screen.width(),(double)(box.top-screen.top)/screen.height(),(double)box.width()/screen.width()));
+            }
+            unique=DouyinCaption.select(captions);
+        }
         return unique;
+    }
+    private boolean youtubeOverflow(AccessibilityNodeInfo source){
+        if(source==null||!compact(source))return false;
+        android.graphics.Rect box=new android.graphics.Rect();source.getBoundsInScreen(box);
+        android.util.DisplayMetrics screen=getResources().getDisplayMetrics();
+        if(box.centerY()>screen.heightPixels*.65||box.centerX()<screen.widthPixels*.5)return false;
+        if(MenuActions.youtubeMore(text(source.getText()),text(source.getContentDescription()),source.getViewIdResourceName()))return true;
+        for(AccessibilityNodeInfo n:nodes(source))if(MenuActions.youtubeMore(text(n.getText()),text(n.getContentDescription()),n.getViewIdResourceName()))return true;
+        return false;
     }
     private String zhihuTitle(AccessibilityNodeInfo page){
         if(page==null||!"com.zhihu.android".equals(text(page.getPackageName())))return "";

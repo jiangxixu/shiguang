@@ -5,6 +5,8 @@ public class CapturedLinkTest {
         String dy="com.ss.android.ugc.aweme",yt="com.google.android.youtube",zh="com.zhihu.android";
         CapturedLink d=CapturedLink.parse(dy,"3.14 机器人基础课程 #学习 https://v.douyin.com/ABC/",1000,1000,"");
         check(d!=null&&d.title.equals("机器人基础课程 #学习"));
+        CapturedLink shared=CapturedLink.parse(dy,"7.12 复制打开抖音，看看【医路向前巍子的作品】记住这四点，能让您比同龄人更年轻# 抖出健康知识宝... https://v.douyin.com/SqkJeQAhshc/ :7pm l@C.hO 06/27 Mjp:/",1000,1000,"");
+        check(shared!=null&&shared.url.equals("https://v.douyin.com/SqkJeQAhshc/")&&shared.title.startsWith("记住这四点，能让您比同龄人更年轻"));
         CapturedLink y=CapturedLink.parse(yt,"Robotics tutorial https://youtu.be/AbC123_-xyZ",1100,1000,"");
         check(y!=null&&y.title.equals("Robotics tutorial"));
         check(CapturedLink.parse(dy,"https://v.douyin.com/ABC/",700,1000,"")==null);

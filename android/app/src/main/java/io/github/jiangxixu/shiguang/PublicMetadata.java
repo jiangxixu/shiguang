@@ -37,7 +37,11 @@ final class PublicMetadata {
         return null;
     }
     static String stateJson(String html){
-        Matcher m=Pattern.compile("window\\.__INITIAL_STATE__\\s*=\\s*\\{").matcher(html);if(!m.find())return null;
+        return assignedJson(html,"__INITIAL_STATE__");
+    }
+    static String assignedJson(String html,String variable){
+        if(html==null||html.length()>3000000)return null;
+        Matcher m=Pattern.compile("window\\."+Pattern.quote(variable)+"\\s*=\\s*\\{").matcher(html);if(!m.find())return null;
         int start=m.end()-1,depth=0;boolean quoted=false,escaped=false;StringBuilder out=new StringBuilder();
         for(int i=start;i<html.length()&&i-start<2000000;i++){
             char c=html.charAt(i);
