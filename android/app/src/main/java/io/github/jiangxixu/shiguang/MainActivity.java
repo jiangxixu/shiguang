@@ -107,7 +107,7 @@ public class MainActivity extends Activity {
     }
     private void enableAutoCapture(){
         new android.app.AlertDialog.Builder(this).setTitle("启用收藏跟随（试用）")
-            .setMessage("支持尝试适配小红书、B站、知乎、抖音（含极速版）、YouTube 的可识别按钮。YouTube 对应保存到播放列表或稍后观看。允许拾光在这些 App 的前台页面本地比较收藏前后的按钮状态；确认新增收藏后，尝试自动打开分享菜单并点击复制链接，再弹出分类窗口。平常单独点击分享不会触发拾光。系统拦截弹窗时，显示可点击的「选择分类」提示。只有你确认保存，原链接及填写的信息才会同步。\n\n不读取密码、不上传页面树，不操作点赞或取消收藏。没有取得新原链接就不保存。不同版本可能无法识别，尚未在你的手机验证。可随时关闭。")
+            .setMessage("支持尝试适配小红书、B站、知乎、抖音（含极速版）、YouTube、微信公众号文章的可识别按钮。YouTube 对应保存到播放列表或稍后观看。允许拾光在这些 App 的前台页面本地比较收藏前后的按钮状态；确认新增收藏后，尝试自动打开分享菜单并点击复制链接，再弹出分类窗口。平常单独点击分享不会触发拾光。系统拦截弹窗时，显示可点击的「选择分类」提示。只有你确认保存，原链接及填写的信息才会同步。\n\n不读取密码、不上传页面树，不操作点赞或取消收藏。没有取得新原链接就不保存。不同版本可能无法识别，尚未在你的手机验证。可随时关闭。")
             .setNegativeButton("暂不开启",null).setPositiveButton("同意并前往系统开启",(dialog,which)->{
                 getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",true).apply();
                 try{startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));}

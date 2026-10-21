@@ -32,7 +32,7 @@ final class ShareLinks {
     private static boolean knownHost(String host){return PlatformLinks.packages(host).length>0||host.equalsIgnoreCase("linux.do")||host.toLowerCase(Locale.ROOT).endsWith(".linux.do");}
     static String platformName(String value){
         try{String h=new URI(value).getHost();String[] pkgs=PlatformLinks.packages(h);if(pkgs.length==0)return h;
-            switch(pkgs[0]){case "com.xingin.xhs":return "小红书";case "tv.danmaku.bili":return "哔哩哔哩";case "com.zhihu.android":return "知乎";case "com.ss.android.ugc.aweme":return "抖音";case "com.google.android.youtube":return "YouTube";case "com.github.android":return "GitHub";default:return h;}
+            switch(pkgs[0]){case "com.xingin.xhs":return "小红书";case "tv.danmaku.bili":return "哔哩哔哩";case "com.zhihu.android":return "知乎";case "com.ss.android.ugc.aweme":return "抖音";case "com.google.android.youtube":return "YouTube";case "com.tencent.mm":return "微信公众号";case "com.github.android":return "GitHub";default:return h;}
         }catch(Exception e){return "网页";}
     }
     static String sharedTitle(String text){
@@ -40,11 +40,11 @@ final class ShareLinks {
         java.util.regex.Matcher m=java.util.regex.Pattern.compile("【([^【】\\r\\n]{1,500})\\s*\\|\\s*小红书(?:[^【】]*)】").matcher(text);
         if(m.find()){String title=m.group(1).trim();int author=title.lastIndexOf(" - ");if(author>0)title=title.substring(0,author).trim();return title;}
         List<String> links=candidates(text);
-        if(links.size()==1&&platformName(links.get(0)).equals("知乎")){
+        if(links.size()==1&&(platformName(links.get(0)).equals("知乎")||platformName(links.get(0)).equals("微信公众号"))){
             Matcher link=LINK.matcher(text);String prefix=link.find()?text.substring(0,link.start()).trim():"";
             for(String line:prefix.split("[\\r\\n]+")){
                 String title=line.trim().replaceFirst("\\s*[-—]\\s*知乎\\s*$","").replaceAll("^[「【]|[」】]$","").trim();
-                if(title.length()>=2&&title.length()<=500&&!title.matches("(?:知乎|分享自知乎|打开知乎.*|来自知乎.*)"))return title;
+                if(title.length()>=2&&title.length()<=500&&!title.matches("(?:知乎|微信公众号|微信公众平台|微信|分享自知乎|分享自微信|打开微信.*|打开知乎.*|来自知乎.*)"))return title;
             }
         }
         if(links.size()==1&&(platformName(links.get(0)).equals("抖音")||platformName(links.get(0)).equals("YouTube"))){

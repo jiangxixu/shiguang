@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.19\n\n自动收藏只由原 App 的收藏/保存触发。移除单独点击分享即启动采集的入口；普通分享点击会清除之前的检测关联，不会自动复制链接或弹出拾光分类窗口。\n\n适配本机按钮只记录收藏/保存，移除备用分享触发选项。已有收藏/保存适配保留；原分享定位记录仅用于收藏成功之后自动取得原内容链接。收藏成功后的取链接、分类确认和同步流程保留。用户主动选择系统“分享 → 拾光”仍可保存。\n\n覆盖安装后打开一次拾光。如无障碍服务未连接，关闭再开启该服务；无需重新配置已适配的收藏按钮。";
+ const notes="拾光 Android 1.6.20\n\n新增微信公众号文章支持：平台筛选、分类保存、原链接识别、标题和封面补全；网站和电脑扩展同步识别微信公众号来源。支持 /s/ 短地址及带 __biz、mid、idx、sn 的文章地址，保留原链接参数。\n\n自动收藏适配：进入公众号文章阅读页，点右上角更多菜单里的收藏，确认收藏后取得原文章链接并弹出分类窗口。适配本机按钮新增“微信公众号”。只接受具有公众号文章标记的 WebView 及其短时关联菜单；普通聊天消息、图片及日常分享不作为文章收藏触发。没有可验证的原文章链接不保存。\n\n标题及封面从手机可访问的公开文章页面解析，验证/删除页面不会冒充内容。取得的信息随收藏同步；微信未暴露文章标记、菜单按钮或网页要求验证时，可能仍无法自动采集。回归测试与构建通过不代表已在用户微信版本实测。\n\n覆盖安装后关闭再开启一次拾光无障碍服务，使新增微信监听生效。已有平台按钮适配和收藏保留。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:false})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();

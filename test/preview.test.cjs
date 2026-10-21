@@ -116,3 +116,15 @@ test('YouTube short-link hostname is still a placeholder after canonicalization 
  let raw=JSON.stringify([{...item,title:'youtu.be'}]);const storage={getItem:()=>raw,setItem:(k,v)=>raw=v};Capture.save(storage,[item]);assert.equal(JSON.parse(raw)[0].title,item.title);assert.equal(JSON.parse(raw)[0].notes,'keep this reason');
  assert.equal(SG.needsTitle({url:item.url,title:'How youtu.be redirects work'}),false);assert.equal(SG.needsTitle({url:item.url,title:'How to use www.youtube.com'}),false);assert.equal(SG.needsTitle({url:item.url,title:'youtu.be.evil.example'}),false);
 });
+
+
+test('WeChat article URLs retain identity and native preview saves original metadata with categories',async()=>{
+ const url='http://mp.weixin.qq.com/s?__biz=MzA1AA%3D%3D&mid=123&idx=1&sn=0123456789abcdef0123456789abcdef';
+ const item=SG.normalize({url,tags:['学习'],notes:'留着复习'});
+ assert.equal(item.platform,'wechat');assert.equal(item.type,'article');assert.equal(new URL(item.url).searchParams.get('__biz'),'MzA1AA==');assert.equal(new URL(item.url).protocol,'https:');
+ assert.equal(SG.detect('https://mp.weixin.qq.com.evil.test/s/abc'),'other');
+ const page={window:null,SG,URL,setTimeout,clearTimeout,ShiguangPreviewNative:{postMessage(raw){const d=JSON.parse(raw);queueMicrotask(()=>this.onmessage({data:JSON.stringify({id:d.id,title:'公众号原文章标题',thumbnail:'https://mmbiz.qpic.cn/mmbiz_jpg/test/0?wx_fmt=jpeg'})}));}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/preview-client.js','utf8'),page);
+ const meta=await page.ShiguangPreview.fetch(item);assert.equal(meta.title,'公众号原文章标题');assert.ok(page.ShiguangPreview.apply(item,meta));
+ assert.equal(item.thumbnail,'https://mmbiz.qpic.cn/mmbiz_jpg/test/0?wx_fmt=jpeg');assert.deepEqual(item.tags,['学习']);assert.equal(item.notes,'留着复习');
+});

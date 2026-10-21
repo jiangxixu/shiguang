@@ -1,6 +1,6 @@
 (function(root){
  'use strict';
- const domains=['bilibili.com','b23.tv','youtube.com','youtu.be','linux.do','zhihu.com','zhihu.link','xiaohongshu.com','xhslink.com','xhslink.cn','douyin.com','iesdouyin.com','github.com'];
+ const domains=['mp.weixin.qq.com','bilibili.com','b23.tv','youtube.com','youtu.be','linux.do','zhihu.com','zhihu.link','xiaohongshu.com','xhslink.com','xhslink.cn','douyin.com','iesdouyin.com','github.com'];
  const needsTitle=SG.needsTitle;
  function apply(item,meta){let changed=false;if(!item.thumbnail&&SG.safeImage(meta.thumbnail)){item.thumbnail=SG.safeImage(meta.thumbnail);changed=true;}if(needsTitle(item)&&meta.title&&!needsTitle({...item,title:meta.title})){item.title=String(meta.title).slice(0,500);changed=true;}return changed;}
  function supported(url){try{const u=new URL(url);return u.protocol==='https:'&&domains.some(d=>u.hostname===d||u.hostname.endsWith('.'+d));}catch{return false;}}
@@ -16,9 +16,10 @@
  async function fetchPreview(item,onProgress){
   const direct=SG.thumbnailFor(item);if(direct&&!needsTitle(item))return {thumbnail:direct};
   let partial=direct?{thumbnail:direct}:{};
-  if(root.ShiguangPreviewNative&&/^https:\/\/(?:[^/]+\.)?(?:bilibili\.com|b23\.tv|xiaohongshu\.com|xhslink\.com|xhslink\.cn|zhihu\.com|zhihu\.link|douyin\.com|iesdouyin\.com|youtube\.com|youtu\.be)\//i.test(item.url)){
+  if(root.ShiguangPreviewNative&&/^https:\/\/(?:[^/]+\.)?(?:bilibili\.com|b23\.tv|xiaohongshu\.com|xhslink\.com|xhslink\.cn|zhihu\.com|zhihu\.link|douyin\.com|iesdouyin\.com|youtube\.com|youtu\.be|mp\.weixin\.qq\.com)\//i.test(item.url)){
    const native=await phonePreview(item.url);partial={...native,thumbnail:native.thumbnail||direct};try{onProgress?.(partial);}catch{}if(native.requiresLogin||(partial.thumbnail&&(!needsTitle(item)||native.title)))return partial;
   }
+  if(SG.detect(item.url)==='wechat')return partial;
   const cloud=root.ShiguangCloud;if(!cloud||!supported(item.url))return partial;
   try{await cloud.ready;const {data}=await cloud.client.auth.getSession();if(!data.session)return partial;
   const response=await fetch(root.ShiguangCloudConfig.url+'/functions/v1/link-preview',{method:'POST',headers:{'Content-Type':'application/json',apikey:root.ShiguangCloudConfig.key,Authorization:'Bearer '+data.session.access_token},body:JSON.stringify({url:item.url}),signal:AbortSignal.timeout(10000)});

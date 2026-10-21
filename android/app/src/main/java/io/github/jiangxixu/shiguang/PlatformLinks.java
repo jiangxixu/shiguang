@@ -14,6 +14,7 @@ final class PlatformLinks {
         if(host(h,"zhihu.com")||host(h,"zhihu.link"))return new String[]{"com.zhihu.android"};
         if(host(h,"douyin.com")||host(h,"iesdouyin.com"))return new String[]{"com.ss.android.ugc.aweme","com.ss.android.ugc.aweme.lite"};
         if(host(h,"youtube.com")||host(h,"youtu.be"))return new String[]{"com.google.android.youtube"};
+        if(h.equals("mp.weixin.qq.com"))return new String[]{"com.tencent.mm"};
         if(host(h,"github.com"))return new String[]{"com.github.android"};
         return new String[0];
     }

@@ -55,10 +55,11 @@ final class PreviewBridge {
         if(family.equals("youtube"))current="https://www.youtube.com/oembed?url="+java.net.URLEncoder.encode(value,"UTF-8")+"&format=json";
         long deadline=android.os.SystemClock.elapsedRealtime()+10000;
         for(int hop=0;hop<5;hop++){
+            if(family.equals("wechat")&&!FavoriteRules.contentUrl("com.tencent.mm",current))return new JSONObject();
             if(!ContentPreviewUrls.redirect(value,current))return new JSONObject();
             long remaining=deadline-android.os.SystemClock.elapsedRealtime();if(remaining<=0)return new JSONObject();
             HttpsURLConnection c=(HttpsURLConnection)new URL(current).openConnection();c.setInstanceFollowRedirects(false);
-            c.setConnectTimeout((int)Math.min(3000,remaining));c.setReadTimeout((int)Math.min(3000,remaining));c.setRequestProperty("User-Agent",family.equals("douyin")?"Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36");
+            c.setConnectTimeout((int)Math.min(3000,remaining));c.setReadTimeout((int)Math.min(3000,remaining));c.setRequestProperty("User-Agent",(family.equals("douyin")||family.equals("wechat"))?"Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36");
             try{
                 int status=c.getResponseCode();
                 if(status>=300&&status<400){String location=c.getHeaderField("Location");if(location==null)return new JSONObject();current=new URL(new URL(current),location).toString();continue;}
@@ -70,6 +71,7 @@ final class PreviewBridge {
                 String title,image;
                 if(family.equals("youtube")){JSONObject data=new JSONObject(body);title=data.optString("title","");image=data.optString("thumbnail_url","");}
                 else{java.util.Map<String,String> meta=PublicMetadata.parse(body);title=meta.get("title");image=meta.get("thumbnail");}
+                if(family.equals("wechat")){java.util.Map<String,String> meta=WechatArticle.metadata(body);title=meta.get("title");image=meta.get("thumbnail");}
                 boolean matched=false;
                 if(family.equals("douyin")){
                     JSONObject exact=DouyinMetadata.parse(body,current);matched=exact.optBoolean("matched");

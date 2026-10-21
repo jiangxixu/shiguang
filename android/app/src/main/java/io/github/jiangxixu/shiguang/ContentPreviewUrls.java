@@ -9,6 +9,7 @@ final class ContentPreviewUrls {
             h=h.toLowerCase(Locale.ROOT);
             if(host(h,"zhihu.com")||h.equals("zhihu.link"))return "zhihu";
             if(host(h,"douyin.com")||host(h,"iesdouyin.com"))return "douyin";
+            if(h.equals("mp.weixin.qq.com"))return "wechat";
             if(host(h,"youtube.com")||h.equals("youtu.be"))return "youtube";
         }catch(Exception ignored){}return "";
     }

@@ -60,6 +60,17 @@ public class FavoriteCaptureService extends AccessibilityService {
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(!enabled(this)){reset();return;}
         String pkg=text(event.getPackageName());if(!FavoriteRules.supported(pkg))return;
+        if("com.tencent.mm".equals(pkg)){
+            AccessibilityNodeInfo article=platformRoot(pkg);
+            if(!wechatArticleNodes(article).isEmpty()){
+                menuOrigin.observe(pkg,article.getWindowId(),sourceTitle(article),sceneText(article),SystemClock.elapsedRealtime());
+            }
+            AccessibilityNodeInfo clicked=event.getSource();
+            if(event.getEventType()==AccessibilityEvent.TYPE_VIEW_CLICKED&&wechatMoreControl(clicked))menuOrigin.open(pkg,clicked.getWindowId(),SystemClock.elapsedRealtime());
+            if(!wechatAllowed(article)){
+                if(phase==0){transitions.clear();lastClick=0;lastClickPackage="";}return;
+            }
+        }
         if(phase==4){learnClick(event,pkg);return;}
         if(phase!=0&&!pkg.equals(pendingPackage)){fail("已切换平台，本次收藏跟随已取消，未保存");return;}
         long now=SystemClock.elapsedRealtime();
@@ -76,7 +87,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             // Sharing by itself is not a collection request. Disarm any prior
             // observation so opening a share sheet cannot start a capture.
             AccessibilityNodeInfo clickedControl=event.getSource();
-            boolean videoMenu=phase==0&&"com.google.android.youtube".equals(pkg)&&youtubeOverflow(clickedControl);
+            boolean videoMenu=phase==0&&(("com.google.android.youtube".equals(pkg)&&youtubeOverflow(clickedControl))||("com.tencent.mm".equals(pkg)&&wechatMoreControl(clickedControl)));
             if(phase==0&&!videoMenu&&!favoriteNode(favoriteSource(clickedControl))&&shareSource(clickedControl,pkg)){
                 transitions.clear();menuOrigin.clear();lastClick=0;lastClickPackage="";return;
             }
@@ -180,11 +191,12 @@ public class FavoriteCaptureService extends AccessibilityService {
     private String scope(String pkg,int window){return pkg+":"+window;}
     private void startFavorite(String pkg,String key,boolean confirmed){
         long now=SystemClock.elapsedRealtime();if(phase!=0||now-lastAttempt<4000)return;
+        if("com.tencent.mm".equals(pkg)&&!wechatAllowed(platformRoot(pkg)))return;
         MenuOrigin.Source origin=menuOrigin.source(pkg,now);
         reset();lastAttempt=now;pendingPackage=pkg;clickedKey=key;phase=1;wait.start(now);
         AccessibilityNodeInfo page=platformRoot(pkg);pendingTitle=origin==null?sourceTitle(page):origin.title;
         scene.start(origin==null?(page==null?-1:page.getWindowId()):origin.window,origin==null?sceneText(page):origin.anchor,now);
-        if(origin!=null)state("已识别菜单中的保存，保留原视频信息并等待平台确认");
+        if(origin!=null)state("已识别菜单中的保存，保留原内容信息并等待平台确认");
         if(confirmed)wait.confirm(now);
         state(confirmed?"已识别未收藏→已收藏，准备取得原链接":"已识别收藏按钮，等待平台确认收藏成功");
         handler.postDelayed(confirm,250);
@@ -192,7 +204,8 @@ public class FavoriteCaptureService extends AccessibilityService {
     private void observe(String pkg){
         if(phase!=0)return;
         AccessibilityNodeInfo root=platformRoot(pkg);if(root==null)return;
-        if("com.google.android.youtube".equals(pkg))menuOrigin.observe(pkg,root.getWindowId(),sourceTitle(root),sceneText(root),SystemClock.elapsedRealtime());
+        if("com.tencent.mm".equals(pkg)&&!wechatAllowed(root))return;
+        if("com.google.android.youtube".equals(pkg)||("com.tencent.mm".equals(pkg)&&!wechatArticleNodes(root).isEmpty()))menuOrigin.observe(pkg,root.getWindowId(),sourceTitle(root),sceneText(root),SystemClock.elapsedRealtime());
         boundFavorite=FavoriteBindings.find(this,pkg,"favorite",root,nodes(root));
         Map<String,Boolean> states=new HashMap<>();
         for(AccessibilityNodeInfo n:nodes(root))if(favoriteNode(n)){String key=nodeKey(n);states.put(key,Boolean.TRUE.equals(states.get(key))||selected(n));}
@@ -229,6 +242,14 @@ public class FavoriteCaptureService extends AccessibilityService {
     private String sourceTitle(AccessibilityNodeInfo page){
         if(page==null)return "";String pkg=text(page.getPackageName());
         if(pkg.equals("com.zhihu.android"))return zhihuTitle(page);
+        if(pkg.equals("com.tencent.mm")){
+            String title="";
+            for(AccessibilityNodeInfo n:wechatArticleNodes(page))if((Build.VERSION.SDK_INT>=28&&n.isHeading())||text(n.getViewIdResourceName()).matches("(?:.*[:/])?activity-name")){
+                String value=WechatArticle.title(text(n.getText()));if(value.isEmpty())value=WechatArticle.title(text(n.getContentDescription()));
+                if(!value.isEmpty()){if(!title.isEmpty()&&!title.equals(value))return "";title=value;}
+            }
+            return title;
+        }
         String unique="";android.graphics.Rect screen=new android.graphics.Rect();page.getBoundsInScreen(screen);
         for(AccessibilityNodeInfo n:nodes(page))if(PageTitles.titleId(pkg,n.getViewIdResourceName())){
             android.graphics.Rect box=new android.graphics.Rect();n.getBoundsInScreen(box);
@@ -245,6 +266,37 @@ public class FavoriteCaptureService extends AccessibilityService {
             unique=DouyinCaption.select(captions);
         }
         return unique;
+    }
+    private List<AccessibilityNodeInfo> wechatArticleNodes(AccessibilityNodeInfo page){
+        List<AccessibilityNodeInfo> empty=Collections.emptyList();if(page==null||!"com.tencent.mm".equals(text(page.getPackageName())))return empty;
+        for(AccessibilityNodeInfo n:nodes(page))if(text(n.getClassName()).endsWith("WebView")){
+            List<AccessibilityNodeInfo> content=nodes(n);
+            for(AccessibilityNodeInfo item:content)if(WechatArticle.marker(item.getViewIdResourceName(),text(item.getText()))||WechatArticle.marker(item.getViewIdResourceName(),text(item.getContentDescription())))return content;
+        }
+        return empty;
+    }
+    private boolean wechatAllowed(AccessibilityNodeInfo page){
+        if(!wechatArticleNodes(page).isEmpty())return true;
+        // A copy-link menu is accepted only after a verified article's More action,
+        // or during the capture already initiated from that article.
+        boolean context=menuOrigin.source("com.tencent.mm",SystemClock.elapsedRealtime())!=null||((phase==1||phase==2)&&"com.tencent.mm".equals(pendingPackage)&&scene.tracked());
+        if(!context)return false;
+        for(AccessibilityNodeInfo n:nodes(page))if(FavoriteRules.copy(text(n.getText()))||FavoriteRules.copy(text(n.getContentDescription())))return true;
+        return false;
+    }
+    private boolean wechatMoreControl(AccessibilityNodeInfo node){
+        if(node==null||!compact(node))return false;
+        android.graphics.Rect box=new android.graphics.Rect();node.getBoundsInScreen(box);android.util.DisplayMetrics m=getResources().getDisplayMetrics();
+        if(box.centerX()<m.widthPixels*.7||box.centerY()>m.heightPixels*.2)return false;
+        for(AccessibilityNodeInfo n:nodes(node))if(WechatArticle.more(text(n.getText()))||WechatArticle.more(text(n.getContentDescription())))return true;
+        return false;
+    }
+    private AccessibilityNodeInfo wechatMore(AccessibilityNodeInfo page){
+        AccessibilityNodeInfo found=null;
+        for(AccessibilityNodeInfo n:nodes(page))if(wechatMoreControl(n)){
+            AccessibilityNodeInfo target=control(n);if(found!=null&&!found.equals(target))return null;found=target;
+        }
+        return found;
     }
     private boolean youtubeOverflow(AccessibilityNodeInfo source){
         if(source==null||!compact(source))return false;
@@ -300,7 +352,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         // locally in memory. It is never persisted in diagnostics or sent to a server.
         String title=sourceTitle(root);if(!title.isEmpty())return title;
         String fallback="";
-        for(AccessibilityNodeInfo n:nodes(root)){
+        for(AccessibilityNodeInfo n:("com.tencent.mm".equals(text(root==null?null:root.getPackageName()))?wechatArticleNodes(root):nodes(root))){
             String value=text(n.getText()).trim().replaceAll("\\s+"," ");
             if(value.isEmpty()||value.length()>300||FavoriteRules.favoriteButton(value)||FavoriteRules.savedButton(value)||FavoriteRules.success(value)||FavoriteRules.share(value)||FavoriteRules.copy(value))continue;
             String id=text(n.getViewIdResourceName());
@@ -323,6 +375,10 @@ public class FavoriteCaptureService extends AccessibilityService {
         long now=SystemClock.elapsedRealtime();
         AccessibilityNodeInfo page=root();
         if(wait.ready(now)){
+            if("com.tencent.mm".equals(pendingPackage)&&wechatAllowed(page)&&button(true)!=null){
+                phase=2;copyTimeout=8000;copyStarted=now;
+                state("公众号收藏已确认，正在从文章菜单取得原链接");handler.post(pollCopy);return;
+            }
             if(sameScene(page)){beginShare();return;}
             if(!scene.tracked()||scene.expired(now)||wait.returnExpired(now)){state("收藏已确认，但无法核对原内容窗口，请回到原内容后点分享继续");manualShare();return;}
             handler.postDelayed(confirm,250);return;
@@ -378,7 +434,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(phase!=1||!enabled(this))return;
         AccessibilityNodeInfo page=root();if(page==null){fail("无法读取原平台当前窗口，本次未保存");return;}
         String title=sourceTitle(page);if(!title.isEmpty()){pendingTitle=title;state("已读取原页面标题，将随原链接保存");}
-        AccessibilityNodeInfo share=button(false);
+        AccessibilityNodeInfo share=pendingPackage.equals("com.tencent.mm")?wechatMore(page):button(false);
         if(share==null&&pendingPackage.equals("com.zhihu.android")){share=zhihuMore(page);zhihuMoreOpened=share!=null;}
         lastAttempt=SystemClock.elapsedRealtime();
         if(share==null){if(pendingPackage.equals("com.zhihu.android"))state("知乎自动取链接："+(pendingTitle.isEmpty()?"未读到明确标题":"已读到原页面标题")+"；未找到可唯一定位的分享/更多控件");manualShare();return;}
@@ -467,7 +523,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         for(int i=0;i<30;i++){AccessibilityNodeInfo parent=page.getParent();if(parent==null)break;page=parent;}
         String rule=FavoriteBindings.capture(page,target);if(rule==null){state("未取得独立按钮，请只点图标，不要点页面空白处");return;}
         pendingPackage=pkg;learningArmed=false;
-        FavoriteBindings.save(this,pkg,"favorite",rule);String key=nodeKey(target);reset();
+        FavoriteBindings.save(this,pkg,"favorite",rule);String key=nodeKey(target);phase=0;lastAttempt=0;
         state("已永久记录本机收藏/保存按钮，后续无需重复适配");startFavorite(pkg,key,false);if(selected(target))wait.confirm(SystemClock.elapsedRealtime());
     }
 
