@@ -27,6 +27,14 @@ public class WechatArticleTest {
         meta=WechatArticle.metadata("<title>该内容已被发布者删除</title><meta property='og:image' content='https://example.com/error.png'>");
         assertEquals("",meta.get("title"));assertEquals("",meta.get("thumbnail"));
     }
+    @Test public void actualUserArticleMetadataRetainsHeadingAndCover()throws Exception{
+        java.io.InputStream stream=getClass().getResourceAsStream("/wechat-article-metadata.html");assertNotNull(stream);
+        String html;try(java.io.InputStream in=stream){html=new String(in.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);}
+        Map<String,String> meta=WechatArticle.metadata(html);
+        assertTrue(meta.get("title").contains("See-and-Reach"));assertTrue(meta.get("title").contains("最后10 米才见真章"));
+        assertTrue(meta.get("thumbnail").startsWith("https://mmbiz.qpic.cn/"));assertTrue(meta.get("thumbnail").endsWith("wx_fmt=jpeg"));
+        assertTrue(FavoriteRules.contentUrl("com.tencent.mm","https://mp.weixin.qq.com/s/fkpYKJ-ZJh7dSdGcNW04jg?scene=1&click_id=1945313300"));
+    }
     @Test public void copiedLinkKeepsArticleTitleAndFreshness(){
         CapturedLink saved=CapturedLink.parse("com.tencent.mm",SHORT,1000,1000,"公众号文章原始标题");
         assertNotNull(saved);assertEquals("公众号文章原始标题",saved.title);

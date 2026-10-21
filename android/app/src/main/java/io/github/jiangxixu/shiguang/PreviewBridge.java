@@ -66,7 +66,14 @@ final class PreviewBridge {
                 if(status!=200)return new JSONObject();
                 String body;
                 try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
-                    byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(out.size()+n>2000000||android.os.SystemClock.elapsedRealtime()>=deadline)return new JSONObject();out.write(buffer,0,n);}body=new String(out.toByteArray(),StandardCharsets.UTF_8);
+                    // WeChat includes large script bundles after its metadata. Read a
+                    // bounded head prefix so a long article does not lose title/cover.
+                    int limit=family.equals("wechat")?512000:2000000;
+                    byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){
+                        if(android.os.SystemClock.elapsedRealtime()>=deadline)return new JSONObject();
+                        if(out.size()+n>limit){if(!family.equals("wechat"))return new JSONObject();out.write(buffer,0,limit-out.size());break;}
+                        out.write(buffer,0,n);
+                    }body=new String(out.toByteArray(),StandardCharsets.UTF_8);
                 }
                 String title,image;
                 if(family.equals("youtube")){JSONObject data=new JSONObject(body);title=data.optString("title","");image=data.optString("thumbnail_url","");}
