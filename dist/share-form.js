@@ -7,7 +7,18 @@
   if(item?.pending){if(draft)return;draft={pending:true,title:item.title||'选择分类后保存',platform:item.platform,url:''};const source=document.getElementById('platform');if(source)source.textContent='来源：'+(item.platform||'原应用');resolveDraft();return;}
   if(draft)return;draft=SG.normalize(item);if(draft&&!draft.thumbnail)draft.thumbnail=SG.thumbnailFor(draft);resolveDraft();
   if(draft){const source=document.getElementById('platform');if(source)source.textContent='来源：'+(SG.platforms[draft.platform]?.name||'其他网站');}
-  function applyMetadata(meta){if(persisted)return;if(meta.thumbnail)draft.thumbnail=SG.safeImage(meta.thumbnail);if(meta.title&&ShiguangPreview.needsTitle(draft)){draft.title=String(meta.title).slice(0,500);document.getElementById('title').textContent=draft.title;}if(meta.requiresLogin)document.getElementById('status').textContent='小红书要求网页登录。可先保存原链接，再到拾光「我 → 登录小红书补全信息」，登录后补全封面。';}
+  function applyMetadata(meta){
+   if(persisted){
+    // Re-read the current library: never resurrect a deleted item or overwrite edits.
+    if(localStorage.getItem('shiguang.cloud.owner')!==owner)return;
+    const items=JSON.parse(localStorage.getItem(ShiguangCapture.KEY)||'[]');
+    const current=items.find(item=>SG.canonical(item.url)===SG.canonical(draft.url));
+    if(!current)return;let changed=false;
+    if(!current.thumbnail&&SG.safeImage(meta.thumbnail)){current.thumbnail=SG.safeImage(meta.thumbnail);changed=true;}
+    if(SG.needsTitle(current)&&meta.title&&!SG.needsTitle({...current,title:meta.title})){current.title=String(meta.title).slice(0,500);changed=true;}
+    if(changed)localStorage.setItem(ShiguangCapture.KEY,JSON.stringify(items));
+    return;
+   }if(meta.thumbnail)draft.thumbnail=SG.safeImage(meta.thumbnail);if(meta.title&&ShiguangPreview.needsTitle(draft)){draft.title=String(meta.title).slice(0,500);document.getElementById('title').textContent=draft.title;}if(meta.requiresLogin)document.getElementById('status').textContent='小红书要求网页登录。可先保存原链接，再到拾光「我 → 登录小红书补全信息」，登录后补全封面。';}
   if(draft)metadata=Promise.race([ShiguangPreview.fetch(draft,applyMetadata),new Promise(resolve=>setTimeout(()=>resolve({}),12500))]).then(applyMetadata).catch(()=>{});
  };
  window.shiguangReceiveResolvedShare=item=>{
@@ -31,11 +42,14 @@
    if(saving)throw Error('正在保存，请稍候');if(localStorage.getItem('shiguang.cloud.owner')!==owner)throw Error('账号已切换，请重新分享');saving=true;
    try{
     if(draft.pending)await new Promise((resolve,reject)=>{resolveLink=resolve;rejectLink=reject;report({resolve:true});});
-    await metadata;
     if(localStorage.getItem('shiguang.cloud.owner')!==owner)throw Error('账号已切换，请重新分享');
     const result=ShiguangCapture.save(localStorage,[{...draft,tags:message.tags,notes:message.reason||''}]);
     persisted=true;
     report({saved:true});
+    // Native hosts detach the editor on saved, keeping this bounded job alive.
+    // The durable library itself is the retry source on the next app launch.
+    await metadata;
+    if(localStorage.getItem('shiguang.cloud.owner')!==owner){report({done:true,cloud:false});return {ok:true};}
     let cloud=false;try{const result=await Promise.race([ShiguangCloud.sync(),new Promise(resolve=>setTimeout(()=>resolve({}),5000))]);cloud=!!result.signedIn&&result.pending===0;}catch{}
     report({done:true,cloud,duplicate:result.duplicates>0});return {ok:true,duplicate:result.duplicates>0};
    }catch(error){saving=false;throw error;}

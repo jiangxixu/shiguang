@@ -32,14 +32,14 @@ test('Xiaohongshu cn short links use phone metadata while signed out and repair 
  const titleOnly={url:item.url,title:'xhslink.cn',thumbnail:meta.thumbnail};assert.equal(page.ShiguangPreview.apply(titleOnly,{title:meta.title}),true);assert.equal(titleOnly.title,meta.title);
 });
 
-test('mobile save waits for in-flight note metadata and persists title and cover together',async()=>{
+test('mobile save commits immediately and completes metadata after the editor is dismissed',async()=>{
  let raw='[]',finish;const elements={},reports=[];
  const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({signedIn:true,pending:0})},ShiguangPreview:{needsTitle:item=>!item.title||item.title===new URL(item.url).hostname,fetch:()=>new Promise(resolve=>finish=resolve)},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:id=>elements[id]??={}}};page.window=page;
  vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);
  page.shiguangReceiveShare({url:'https://xhslink.cn/o/ABC123',title:'xhslink.cn'});
  await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});
  const saving=page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',tags:'提升方向',reason:'准备论文'});
- await Promise.resolve();assert.equal(JSON.parse(raw).length,0);assert.equal(reports.length,0);
+ await Promise.resolve();assert.equal(JSON.parse(raw).length,1);assert.equal(reports[0].saved,true);assert.equal(JSON.parse(raw)[0].notes,'准备论文');
  finish({title:'笔记真实标题',thumbnail:'https://sns-webpic-qc.xhscdn.com/note.jpg'});await saving;
  const saved=JSON.parse(raw)[0];assert.equal(saved.title,'笔记真实标题');assert.equal(saved.thumbnail,'https://sns-webpic-qc.xhscdn.com/note.jpg');assert.deepEqual(saved.tags,['提升方向']);assert.equal(saved.notes,'准备论文');
 });
@@ -145,4 +145,20 @@ test('immediate mobile category form preserves choices through link failure and 
  await Promise.resolve();page.shiguangReceiveResolvedShare({url:'https://mp.weixin.qq.com/s/AbCdEfGh_123456',title:'Original article',thumbnail:'https://mmbiz.qpic.cn/test.jpg'});
  await saved;const item=JSON.parse(raw)[0];assert.equal(item.title,'Original article');assert.equal(item.notes,'study');assert.deepEqual(item.tags,['robots']);assert.equal(item.thumbnail,'https://mmbiz.qpic.cn/test.jpg');
  assert.equal(reports.filter(x=>x.saved).length,1);
+});
+
+for(const scenario of ['delete','edit','account'])test('background metadata respects '+scenario,async()=>{
+ let raw='[]',owner='user-a',finish;const reports=[];
+ const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({})},ShiguangPreview:{needsTitle:SG.needsTitle,fetch:()=>new Promise(resolve=>finish=resolve)},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:owner,setItem:(key,value)=>{if(key===Capture.KEY)raw=value;}},setTimeout:()=>{},document:{getElementById:()=>({})}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);
+ page.shiguangReceiveShare({url:'https://v.douyin.com/abc/',title:'v.douyin.com'});
+ await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});
+ const saving=page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',tags:'study',reason:'original'});
+ await Promise.resolve();assert.equal(reports[0].saved,true);
+ if(scenario==='delete')raw='[]';
+ if(scenario==='edit'){const rows=JSON.parse(raw);rows[0].title='My edited title';rows[0].notes='Edited reason';raw=JSON.stringify(rows);}
+ if(scenario==='account'){owner='user-b';raw='[]';}
+ finish({title:'Fetched title',thumbnail:'https://example.com/cover.jpg'});await saving;
+ if(scenario==='edit'){assert.equal(JSON.parse(raw)[0].title,'My edited title');assert.equal(JSON.parse(raw)[0].notes,'Edited reason');}
+ else assert.equal(raw,'[]');
 });

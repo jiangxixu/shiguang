@@ -50,11 +50,13 @@ final class FavoriteCaptureOverlay {
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         WebViewAssetLoader loader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(service)).build();
         WebViewCompat.addWebMessageListener(web,"ShiguangQuickResult",Collections.singleton("https://appassets.androidplatform.net"),(v,message,origin,main,reply)->{
-            if(closed||!main||!"https://appassets.androidplatform.net".equals(origin.toString()))return;
+            if(!main||!"https://appassets.androidplatform.net".equals(origin.toString()))return;
             try{JSONObject data=new JSONObject(message.getData());
+                if(CaptureCompletion.owns(v)){if(data.optBoolean("done")||data.optBoolean("error"))CaptureCompletion.finish(v);return;}
+                if(closed)return;
                 if(data.optBoolean("resolve")&&pendingMode&&!resolving){resolving=true;if(attached){service.getSystemService(WindowManager.class).removeView(container);attached=false;}requestLink.run();return;}
                 if(data.optBoolean("cancel")){finish("已取消，本次未保存");return;}
-                if(data.optBoolean("saved")){saved=true;status.setText("已保存，正在同步…");handler.postDelayed(()->finish("已保存在手机，打开拾光后可继续同步"),10000);}
+                if(data.optBoolean("saved")){saved=true;CaptureCompletion.retain(web);web=null;finish("已保存在手机，正在后台补全与同步");return;}
                 if(data.optBoolean("done"))finish(data.optBoolean("duplicate")?"已补全已有收藏":data.optBoolean("cloud")?"已收进拾光并同步":"已保存在手机，联网登录后自动同步");
                 if(data.optBoolean("error"))finish("保存失败，请打开拾光检查存储");
             }catch(Exception ignored){}

@@ -49,7 +49,7 @@ public class QuickShareActivity extends Activity {
         JSONObject item=new JSONObject();
         try{item.put("url",link);item.put("title",title==null?"收藏链接":title.substring(0,Math.min(500,title.length())));}catch(Exception e){complete("无法读取分享内容",false);return;}
         String payload=item.toString();
-        web=new WebView(this);web.setBackgroundColor(android.graphics.Color.rgb(246,245,240));setContentView(web);
+        web=new WebView(getApplicationContext());web.setBackgroundColor(android.graphics.Color.rgb(246,245,240));setContentView(web);
         getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);getWindow().setDimAmount(0.3f);
         getWindow().setGravity(android.view.Gravity.BOTTOM);
@@ -60,11 +60,13 @@ public class QuickShareActivity extends Activity {
         WebViewAssetLoader loader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
         final boolean canReport=WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER);
         if(canReport)WebViewCompat.addWebMessageListener(web,"ShiguangQuickResult",Collections.singleton("https://appassets.androidplatform.net"),(v,message,origin,mainFrame,reply)->{
-            if(!mainFrame||!"https://appassets.androidplatform.net".equals(origin.toString())||done)return;
+            if(!mainFrame||!"https://appassets.androidplatform.net".equals(origin.toString()) )return;
             try{
                 JSONObject report=new JSONObject(message.getData());
+                if(CaptureCompletion.owns(v)){if(report.optBoolean("done")||report.optBoolean("error"))CaptureCompletion.finish(v);return;}
+                if(done)return;
                 if(report.optBoolean("cancel")){setResult(RESULT_CANCELED);finish();return;}
-                if(report.optBoolean("saved")){locallySaved=true;handler.postDelayed(timeout,10000);}
+                if(report.optBoolean("saved")){locallySaved=true;CaptureCompletion.retain(web);web=null;done=true;handler.removeCallbacks(timeout);setResult(RESULT_OK);finish();return;}
                 if(report.optBoolean("done"))complete(report.optBoolean("duplicate")?"拾光中已收藏过这条内容":report.optBoolean("cloud")?"已收进拾光并同步到云端":"已保存在手机，联网登录后自动同步",locallySaved);
                 if(report.optBoolean("error"))complete("未保存：存储异常，请打开拾光检查或备份",false);
             }catch(Exception ignored){}
