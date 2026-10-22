@@ -60,6 +60,14 @@ public class FavoriteCaptureService extends AccessibilityService {
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(!enabled(this)){reset();return;}
         String pkg=text(event.getPackageName());if(!FavoriteRules.supported(pkg))return;
+        // Toasts/announcements may arrive after the menu has closed, with no
+        // article root. Consume the scoped receipt before the article UI gate.
+        if(WechatConfirmation.pending(phase,pendingPackage,pkg,SystemClock.elapsedRealtime()-lastAttempt)&&WechatConfirmation.transientEvent(event.getEventType())){
+            boolean receipt=WechatConfirmation.receipt(text(event.getContentDescription()));
+            for(CharSequence value:event.getText())receipt|=WechatConfirmation.receipt(text(value));
+            if(receipt){wait.confirm(SystemClock.elapsedRealtime());state("已收到微信公众号收藏成功提示，等待原文章返回");}
+            return;
+        }
         if("com.tencent.mm".equals(pkg)){
             AccessibilityNodeInfo article=platformRoot(pkg);
             if(!wechatArticleNodes(article).isEmpty()){
@@ -383,13 +391,22 @@ public class FavoriteCaptureService extends AccessibilityService {
             if(!scene.tracked()||scene.expired(now)||wait.returnExpired(now)){state("收藏已确认，但无法核对原内容窗口，请回到原内容后点分享继续");manualShare();return;}
             handler.postDelayed(confirm,250);return;
         }
-        if(wait.expired(now)){fail("已识别点击，但15秒内未确认收藏成功；未保存。B站请先确认收藏夹。");return;}
+        if(wait.expired(now)){
+            recordPageDiagnostic(pendingPackage,"收藏确认超时",null);
+            fail("已识别点击，但15秒内未确认收藏成功；未保存。"+(FavoriteRules.platform(pendingPackage)==1?"B站请先确认收藏夹。":""));return;
+        }
         boolean original=sameScene(page);
         for(AccessibilityNodeInfo n:nodes(page)){
             String d=text(n.getContentDescription()),t=text(n.getText());
+            if(WechatConfirmation.pending(phase,pendingPackage,text(n.getPackageName()),now-lastAttempt)&&outsideWebContent(n)&&(WechatConfirmation.receipt(t)||WechatConfirmation.receipt(d))){wait.confirm(now);break;}
             if((FavoriteRules.success(t)&&!FavoriteRules.clean(t).equals("已收藏"))||(FavoriteRules.success(d)&&!FavoriteRules.clean(d).equals("已收藏"))||(original&&nodeKey(n).equals(clickedKey)&&favoriteNode(n)&&selected(n))){wait.confirm(now);break;}
         }
         handler.postDelayed(confirm,250);
+    }
+    private boolean outsideWebContent(AccessibilityNodeInfo node){
+        // Do not mistake an article mentioning “已收藏” for a native receipt.
+        for(int depth=0;node!=null&&depth<64;depth++,node=node.getParent())if(text(node.getClassName()).endsWith("WebView"))return false;
+        return node==null;
     }
     private AccessibilityNodeInfo button(boolean copy){
         AccessibilityNodeInfo root=root();
