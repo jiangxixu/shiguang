@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.22\n\n修复微信公众号收藏确认：收藏菜单关闭后，仍接收本次微信操作的短暂成功提示及无障碍播报；支持原生“已收藏”提示，不再被文章窗口检查提前忽略。仅在已识别的公众号收藏操作后15秒内接受微信确认，普通分享、闲置提示及文章正文中的相同文字不会独立触发采集。仍须取得并校验原文章链接才可保存。\n\n收藏确认超时会记录当前平台诊断，B站收藏夹提示只在B站显示。保留公众号原标题和封面解析、现有收藏及按钮适配。\n\n覆盖安装后关闭并重新开启拾光无障碍服务，以启用新增播报事件监听。自动测试和构建不等于用户手机微信实测；若仍超时，请提供新版检测记录。";
+ const notes="拾光 Android 1.6.23\n\n稳定性修复：其他已支持App的后台事件不再直接取消正在进行的收藏；已经打开的分类表单不再被其他平台事件关闭。无障碍中断后首次重新收到事件会恢复定时检测，服务重连清理旧任务。窗口短暂不可读时保留检测上下文，等待最长2秒；收藏确认后，取链接入口暂未出现时最多等待2秒再提示手动继续，不重复点击原App收藏。\n\n收藏控件确认增加本次点击的临时结构匹配，可容忍按钮轻微位移；仍要求同一原内容和唯一按钮匹配，不通过放宽原链接校验来提高成功率。检测记录保留最近60条，复制菜单超时记录当前平台结构，便于定位具体失败阶段。\n\n保留标题封面、原链接和分类保存。普通分享仍不独立触发收藏，不恢复悬浮球和下拉快捷入口。覆盖安装后关闭再开启无障碍服务，已有适配及收藏保留。\n\n自动回归测试、构建和签名检查不能代替各平台真机测试；第三方App隐藏控件或变更界面时仍可能无法自动识别。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:false})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();

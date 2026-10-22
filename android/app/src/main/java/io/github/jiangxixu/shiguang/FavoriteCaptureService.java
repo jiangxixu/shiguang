@@ -16,6 +16,10 @@ public class FavoriteCaptureService extends AccessibilityService {
     private final FavoriteWait wait=new FavoriteWait();
     private final FavoriteScene scene=new FavoriteScene();
     private final MenuOrigin menuOrigin=new MenuOrigin();
+    private final CaptureReadiness shareReadiness=new CaptureReadiness();
+    private final CaptureReadiness sampleReadiness=new CaptureReadiness();
+    private String pendingFavoriteSelector="";
+    private boolean samplingInterrupted;
     private int phase; // 0 idle, 1 waiting for favorite success, 2 locating copy-link action
     private final FavoriteTransitions transitions=new FavoriteTransitions();
     private FavoritePrompt prompt;
@@ -30,6 +34,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     private final Runnable sample=new Runnable(){public void run(){
         if(!enabled(FavoriteCaptureService.this)||phase!=0)return;
         AccessibilityNodeInfo root=getRootInActiveWindow();
+        if(sampleReadiness.retry(SystemClock.elapsedRealtime(),root!=null)){handler.postDelayed(this,250);return;}
         String pkg=root==null?"":text(root.getPackageName());
         if(!FavoriteRules.supported(pkg)){transitions.clear();menuOrigin.clear();observedPackage="";handler.postDelayed(this,1000);return;}
         observe(pkg);
@@ -41,7 +46,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     static void report(Context c,String text){
         String line=new java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.ROOT).format(new Date())+" · "+text;
         String[] old=getPrefs(c).getString("history","").split("\n");
-        StringBuilder history=new StringBuilder();for(int i=Math.max(0,old.length-11);i<old.length;i++)if(!old[i].isEmpty())history.append(old[i]).append('\n');
+        StringBuilder history=new StringBuilder();for(int i=Math.max(0,old.length-59);i<old.length;i++)if(!old[i].isEmpty())history.append(old[i]).append('\n');
         history.append(line);getPrefs(c).edit().putString("status",line).putString("history",history.toString()).apply();
     }
     static String history(Context c){
@@ -54,12 +59,16 @@ public class FavoriteCaptureService extends AccessibilityService {
     private void state(String text){report(this,text);}
     static boolean enabled(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getBoolean("enabled",false);}
     static void pause(Context c){c.getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();if(instance!=null){instance.reset();instance.disableSelf();}}
-    @Override protected void onServiceConnected(){instance=this;state("服务已连接，等待已支持平台的收藏/保存操作");handler.post(sample);}
-    private void reset(){handler.removeCallbacksAndMessages(null);if(captureOverlay!=null){captureOverlay.dismiss();captureOverlay=null;}if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();menuOrigin.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;boundFavorite=null;if(instance==this&&enabled(this))handler.postDelayed(sample,200);}
+    @Override protected void onServiceConnected(){instance=this;samplingInterrupted=false;reset();state("服务已连接，等待已支持平台的收藏/保存操作");}
+    private void reset(){handler.removeCallbacksAndMessages(null);if(captureOverlay!=null){captureOverlay.dismiss();captureOverlay=null;}if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingFavoriteSelector="";shareReadiness.reset();sampleReadiness.reset();pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();menuOrigin.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;boundFavorite=null;if(instance==this&&enabled(this))handler.postDelayed(sample,200);}
     private String text(CharSequence value){return value==null?"":value.toString();}
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(!enabled(this)){reset();return;}
+        if(samplingInterrupted){samplingInterrupted=false;handler.removeCallbacks(sample);handler.post(sample);state("已重新收到系统事件，自动检测已恢复");}
         String pkg=text(event.getPackageName());if(!FavoriteRules.supported(pkg))return;
+        // A visible classification form owns its lifecycle; background app
+        // events must not close it or discard categories the user is entering.
+        if(phase==3)return;
         // Toasts/announcements may arrive after the menu has closed, with no
         // article root. Consume the scoped receipt before the article UI gate.
         if(WechatConfirmation.pending(phase,pendingPackage,pkg,SystemClock.elapsedRealtime()-lastAttempt)&&WechatConfirmation.transientEvent(event.getEventType())){
@@ -80,7 +89,12 @@ public class FavoriteCaptureService extends AccessibilityService {
             }
         }
         if(phase==4){learnClick(event,pkg);return;}
-        if(phase!=0&&!pkg.equals(pendingPackage)){fail("已切换平台，本次收藏跟随已取消，未保存");return;}
+        if(phase!=0&&!pkg.equals(pendingPackage)){
+            AccessibilityNodeInfo foreground=getRootInActiveWindow();
+            boolean transientEvent=WechatConfirmation.transientEvent(event.getEventType());
+            if(CaptureReadiness.foreignForeground(pendingPackage,pkg,text(foreground==null?null:foreground.getPackageName()),transientEvent))fail("已切换平台，本次收藏跟随已取消，未保存");
+            return;
+        }
         long now=SystemClock.elapsedRealtime();
         if(phase==2){
             // Learn a missing share entry from a user click only after Copy link appears.
@@ -201,7 +215,12 @@ public class FavoriteCaptureService extends AccessibilityService {
         long now=SystemClock.elapsedRealtime();if(phase!=0||now-lastAttempt<4000)return;
         if("com.tencent.mm".equals(pkg)&&!wechatAllowed(platformRoot(pkg)))return;
         MenuOrigin.Source origin=menuOrigin.source(pkg,now);
-        reset();lastAttempt=now;pendingPackage=pkg;clickedKey=key;phase=1;wait.start(now);
+        AccessibilityNodeInfo before=platformRoot(pkg);String selector="";
+        if(!key.isEmpty())for(AccessibilityNodeInfo n:nodes(before))if(nodeKey(n).equals(key)){
+            String captured=FavoriteBindings.capture(before,control(n));if(captured!=null){selector=captured;break;}
+        }
+        reset();shareReadiness.reset();lastAttempt=now;pendingPackage=pkg;clickedKey=key;phase=1;wait.start(now);
+        pendingFavoriteSelector=selector;
         AccessibilityNodeInfo page=platformRoot(pkg);pendingTitle=origin==null?sourceTitle(page):origin.title;
         scene.start(origin==null?(page==null?-1:page.getWindowId()):origin.window,origin==null?sceneText(page):origin.anchor,now);
         if(origin!=null)state("已识别菜单中的保存，保留原内容信息并等待平台确认");
@@ -396,10 +415,12 @@ public class FavoriteCaptureService extends AccessibilityService {
             fail("已识别点击，但15秒内未确认收藏成功；未保存。"+(FavoriteRules.platform(pendingPackage)==1?"B站请先确认收藏夹。":""));return;
         }
         boolean original=sameScene(page);
-        for(AccessibilityNodeInfo n:nodes(page)){
+        List<AccessibilityNodeInfo> currentNodes=nodes(page);
+        AccessibilityNodeInfo clickedNow=original?FavoriteBindings.findCaptured(pendingFavoriteSelector,page,currentNodes):null;
+        for(AccessibilityNodeInfo n:currentNodes){
             String d=text(n.getContentDescription()),t=text(n.getText());
             if(WechatConfirmation.pending(phase,pendingPackage,text(n.getPackageName()),now-lastAttempt)&&outsideWebContent(n)&&(WechatConfirmation.receipt(t)||WechatConfirmation.receipt(d))){wait.confirm(now);break;}
-            if((FavoriteRules.success(t)&&!FavoriteRules.clean(t).equals("已收藏"))||(FavoriteRules.success(d)&&!FavoriteRules.clean(d).equals("已收藏"))||(original&&nodeKey(n).equals(clickedKey)&&favoriteNode(n)&&selected(n))){wait.confirm(now);break;}
+            if((FavoriteRules.success(t)&&!FavoriteRules.clean(t).equals("已收藏"))||(FavoriteRules.success(d)&&!FavoriteRules.clean(d).equals("已收藏"))||(original&&(nodeKey(n).equals(clickedKey)||(clickedNow!=null&&control(n).equals(clickedNow)))&&favoriteNode(n)&&selected(n))){wait.confirm(now);break;}
         }
         handler.postDelayed(confirm,250);
     }
@@ -449,12 +470,16 @@ public class FavoriteCaptureService extends AccessibilityService {
     private boolean copyLabelText(AccessibilityNodeInfo n,boolean system){String t=text(n.getText()),d=text(n.getContentDescription());return system?(FavoriteRules.systemCopy(t)||FavoriteRules.systemCopy(d)):(FavoriteRules.copyForPlatform(pendingPackage,t)||FavoriteRules.copyForPlatform(pendingPackage,d));}
     private void beginShare(){
         if(phase!=1||!enabled(this))return;
-        AccessibilityNodeInfo page=root();if(page==null){fail("无法读取原平台当前窗口，本次未保存");return;}
+        AccessibilityNodeInfo page=root();
+        if(page==null){if(shareReadiness.retry(SystemClock.elapsedRealtime(),false)){handler.postDelayed(confirm,250);return;}fail("原内容窗口持续不可用，本次未保存");return;}
         String title=sourceTitle(page);if(!title.isEmpty()){pendingTitle=title;state("已读取原页面标题，将随原链接保存");}
         AccessibilityNodeInfo share=pendingPackage.equals("com.tencent.mm")?wechatMore(page):button(false);
         if(share==null&&pendingPackage.equals("com.zhihu.android")){share=zhihuMore(page);zhihuMoreOpened=share!=null;}
-        lastAttempt=SystemClock.elapsedRealtime();
-        if(share==null){if(pendingPackage.equals("com.zhihu.android"))state("知乎自动取链接："+(pendingTitle.isEmpty()?"未读到明确标题":"已读到原页面标题")+"；未找到可唯一定位的分享/更多控件");manualShare();return;}
+        if(share==null){
+            if(shareReadiness.retry(SystemClock.elapsedRealtime(),false)){handler.postDelayed(confirm,250);return;}
+            state("收藏已确认，但等待菜单控件2秒后仍未找到唯一取链接入口");manualShare();return;
+        }
+        shareReadiness.reset();lastAttempt=SystemClock.elapsedRealtime();
         // Retain a successful semantic share selector for layouts that later omit its label.
         // It is committed only once the copy-link menu has actually appeared.
         if(!zhihuMoreOpened){String rule=FavoriteBindings.capture(page,control(share));if(rule!=null)pendingShareRule=rule;}
@@ -485,7 +510,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             AccessibilityNodeInfo share=button(false);
             if(share!=null){zhihuShareOpened=true;state("已找到知乎菜单中的分享入口，正在自动打开");if(!clickNode(share)){fail("无法打开知乎分享菜单，本次未保存");return;}handler.postDelayed(this,350);return;}
         }
-        if(SystemClock.elapsedRealtime()-copyStarted>copyTimeout){fail("未找到「复制链接 / 分享链接」，本次未保存。请在分享菜单选择拾光。");return;}
+        if(SystemClock.elapsedRealtime()-copyStarted>copyTimeout){recordPageDiagnostic(pendingPackage,"取链接菜单等待超时",null);fail("未找到「复制链接 / 分享链接」，本次未保存。请在分享菜单选择拾光。");return;}
         handler.postDelayed(this,250);
     }};
     private void recordPageDiagnostic(){recordPageDiagnostic(pendingPackage,"自动取链接未匹配",null);}
@@ -573,6 +598,6 @@ public class FavoriteCaptureService extends AccessibilityService {
         handler.postDelayed(()->{reset();state("分类提示已超时，本次未保存");},45000);
     }
     private void fail(String message){String platform=pendingPackage;reset();state(FavoriteRules.platformName(platform)+" · "+message);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}
-    @Override public void onInterrupt(){reset();handler.removeCallbacks(sample);state("服务被系统中断，请返回无障碍设置检查");}
+    @Override public void onInterrupt(){reset();handler.removeCallbacks(sample);samplingInterrupted=true;state("服务被系统中断，收到后续事件将恢复检测；若持续无反应请检查无障碍设置");}
     @Override public void onDestroy(){if(instance==this)instance=null;reset();super.onDestroy();}
 }

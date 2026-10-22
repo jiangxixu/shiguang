@@ -42,9 +42,15 @@ final class FavoriteBindings {
         }catch(Exception ignored){}
     }
     static AccessibilityNodeInfo find(Context c,String pkg,String role,AccessibilityNodeInfo root,List<AccessibilityNodeInfo> nodes){
+        return find(rules(c,pkg,role),root,nodes);
+    }
+    static AccessibilityNodeInfo findCaptured(String rule,AccessibilityNodeInfo root,List<AccessibilityNodeInfo> nodes){
+        try{return find(new JSONArray().put(new JSONObject(rule)),root,nodes);}catch(Exception ignored){return null;}
+    }
+    private static AccessibilityNodeInfo find(JSONArray profiles,AccessibilityNodeInfo root,List<AccessibilityNodeInfo> nodes){
         if(root==null)return null;
         Rect screen=new Rect();root.getBoundsInScreen(screen);if(screen.isEmpty())return null;
-        JSONArray profiles=rules(c,pkg,role);AccessibilityNodeInfo best=null;int bestScore=-1,second=-1;
+        AccessibilityNodeInfo best=null;int bestScore=-1,second=-1;
         Map<AccessibilityNodeInfo,Integer> scores=new HashMap<>();
         for(int i=0;i<profiles.length();i++)try{
             JSONObject rule=profiles.getJSONObject(i);
