@@ -128,3 +128,21 @@ test('WeChat article URLs retain identity and native preview saves original meta
  const meta=await page.ShiguangPreview.fetch(item);assert.equal(meta.title,'公众号原文章标题');assert.ok(page.ShiguangPreview.apply(item,meta));
  assert.equal(item.thumbnail,'https://mmbiz.qpic.cn/mmbiz_jpg/test/0?wx_fmt=jpeg');assert.deepEqual(item.tags,['学习']);assert.equal(item.notes,'留着复习');
 });
+
+
+test('immediate mobile category form preserves choices through link failure and retries without saving placeholders',async()=>{
+ let raw='[]';const reports=[],elements={};
+ const page={window:null,SG,ShiguangCapture:Capture,ShiguangCloud:{ready:Promise.resolve(),sync:async()=>({signedIn:true,pending:0})},ShiguangPreview:{needsTitle:()=>false,fetch:async()=>({})},ShiguangQuickResult:{postMessage:text=>reports.push(JSON.parse(text))},localStorage:{getItem:key=>key===Capture.KEY?raw:null,setItem:(k,v)=>raw=v},setTimeout:()=>{},document:{getElementById:id=>elements[id]??={}}};page.window=page;
+ vm.createContext(page);vm.runInContext(fs.readFileSync('dist/share-form.js','utf8'),page);
+ page.shiguangReceiveShare({pending:true,title:'Original article',platform:'wechat'});
+ const draft=await page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_GET'});
+ assert.equal(draft.pending,true);assert.equal(raw,'[]');assert.equal(reports.length,0);
+ const failed=page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',tags:'robots',reason:'study'});
+ await Promise.resolve();assert.equal(reports[0].resolve,true);assert.equal(raw,'[]');
+ page.shiguangResolveFailed('link unavailable');await assert.rejects(failed,/link unavailable/);
+ assert.equal(raw,'[]');assert.equal(reports.some(x=>x.saved),false);
+ const saved=page.ShiguangCaptureTransport.sendMessage({type:'SHIGUANG_CAPTURE_SAVE',tags:'robots',reason:'study'});
+ await Promise.resolve();page.shiguangReceiveResolvedShare({url:'https://mp.weixin.qq.com/s/AbCdEfGh_123456',title:'Original article',thumbnail:'https://mmbiz.qpic.cn/test.jpg'});
+ await saved;const item=JSON.parse(raw)[0];assert.equal(item.title,'Original article');assert.equal(item.notes,'study');assert.deepEqual(item.tags,['robots']);assert.equal(item.thumbnail,'https://mmbiz.qpic.cn/test.jpg');
+ assert.equal(reports.filter(x=>x.saved).length,1);
+});

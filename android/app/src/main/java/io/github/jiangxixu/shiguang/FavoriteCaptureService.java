@@ -68,7 +68,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         String pkg=text(event.getPackageName());if(!FavoriteRules.supported(pkg))return;
         // A visible classification form owns its lifecycle; background app
         // events must not close it or discard categories the user is entering.
-        if(phase==3)return;
+        if(phase==3||phase==5)return;
         // Toasts/announcements may arrive after the menu has closed, with no
         // article root. Consume the scoped receipt before the article UI gate.
         if(WechatConfirmation.pending(phase,pendingPackage,pkg,SystemClock.elapsedRealtime()-lastAttempt)&&WechatConfirmation.transientEvent(event.getEventType())){
@@ -223,10 +223,17 @@ public class FavoriteCaptureService extends AccessibilityService {
         pendingFavoriteSelector=selector;
         AccessibilityNodeInfo page=platformRoot(pkg);pendingTitle=origin==null?sourceTitle(page):origin.title;
         scene.start(origin==null?(page==null?-1:page.getWindowId()):origin.window,origin==null?sceneText(page):origin.anchor,now);
-        if(origin!=null)state("已识别菜单中的保存，保留原内容信息并等待平台确认");
-        if(confirmed)wait.confirm(now);
-        state(confirmed?"已识别未收藏→已收藏，准备取得原链接":"已识别收藏按钮，等待平台确认收藏成功");
-        handler.postDelayed(confirm,250);
+        // The user's favorite/save action is enough to open the editor. Saving
+        // into Shiguang is confirmed in that editor, independently of app toasts.
+        phase=5;
+        captureOverlay=new FavoriteCaptureOverlay(this,message->{reset();state(message);},()->{});
+        if(!captureOverlay.showPending(pkg,pendingTitle,()->{
+            phase=1;shareReadiness.reset();long at=SystemClock.elapsedRealtime();lastAttempt=at;wait.start(at);wait.confirm(at);
+            // The user may spend minutes choosing categories; renew only the
+            // deadline, retaining the original article identity.
+            scene.renew(at);state("已选择分类，正在取得本次原内容链接");handler.postDelayed(confirm,250);
+        })){reset();state("无法打开分类窗口，请检查系统 WebView 和无障碍连接");return;}
+        state("已识别收藏/保存，已直接打开分类窗口");
     }
     private void observe(String pkg){
         if(phase!=0)return;
@@ -540,6 +547,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     }
     private void manualShare(){
         recordPageDiagnostic();
+        if(captureOverlay!=null){fail("未找到这篇内容的取链接入口，未保存。分类已保留，可重试。");return;}
         phase=2;copyStarted=SystemClock.elapsedRealtime();copyTimeout=30000;
         state("收藏/保存已识别，正在等待原App分享菜单；无需重新适配收藏按钮");
         String pkg=pendingPackage;prompt=new FavoritePrompt(this);
@@ -570,7 +578,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     }
 
     private void launchCapture(String pkg,long timestamp){
-        if(captureOverlay!=null)return;
+        if(captureOverlay!=null){captureOverlay.acquire(pkg,timestamp,pendingTitle);return;}
         state("已执行取链接动作，正在当前页面打开分类表单");
         captureOverlay=new FavoriteCaptureOverlay(this,message->{reset();state(message);Toast.makeText(this,message,Toast.LENGTH_SHORT).show();},()->{
             captureOverlay=null;
@@ -585,6 +593,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         handler.postDelayed(()->{if(getPrefs(this).getLong("launchAck",0)!=timestamp)offerCapture(pkg,timestamp);else reset();},4000);
     }
     private void offerCapture(String pkg,long timestamp){
+        if(captureOverlay!=null){fail("未能读取本次原链接，未保存。分类已保留，可重试。");return;}
         if(!enabled(this)){reset();return;}
         state("已取得复制动作；系统未弹出界面，请点屏幕下方「选择分类」继续");
         if(prompt!=null)prompt.dismiss();
@@ -597,7 +606,10 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(!shown){fail("无法显示分类提示，请使用原内容的分享→拾光；未保存");return;}
         handler.postDelayed(()->{reset();state("分类提示已超时，本次未保存");},45000);
     }
-    private void fail(String message){String platform=pendingPackage;reset();state(FavoriteRules.platformName(platform)+" · "+message);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}
+    private void fail(String message){
+        if(captureOverlay!=null){handler.removeCallbacksAndMessages(null);phase=5;state(FavoriteRules.platformName(pendingPackage)+" · "+message);captureOverlay.linkFailed(message);return;}
+        String platform=pendingPackage;reset();state(FavoriteRules.platformName(platform)+" · "+message);
+    }
     @Override public void onInterrupt(){reset();handler.removeCallbacks(sample);samplingInterrupted=true;state("服务被系统中断，收到后续事件将恢复检测；若持续无反应请检查无障碍设置");}
     @Override public void onDestroy(){if(instance==this)instance=null;reset();super.onDestroy();}
 }

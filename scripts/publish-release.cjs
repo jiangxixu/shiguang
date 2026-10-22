@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.23\n\n稳定性修复：其他已支持App的后台事件不再直接取消正在进行的收藏；已经打开的分类表单不再被其他平台事件关闭。无障碍中断后首次重新收到事件会恢复定时检测，服务重连清理旧任务。窗口短暂不可读时保留检测上下文，等待最长2秒；收藏确认后，取链接入口暂未出现时最多等待2秒再提示手动继续，不重复点击原App收藏。\n\n收藏控件确认增加本次点击的临时结构匹配，可容忍按钮轻微位移；仍要求同一原内容和唯一按钮匹配，不通过放宽原链接校验来提高成功率。检测记录保留最近60条，复制菜单超时记录当前平台结构，便于定位具体失败阶段。\n\n保留标题封面、原链接和分类保存。普通分享仍不独立触发收藏，不恢复悬浮球和下拉快捷入口。覆盖安装后关闭再开启无障碍服务，已有适配及收藏保留。\n\n自动回归测试、构建和签名检查不能代替各平台真机测试；第三方App隐藏控件或变更界面时仍可能无法自动识别。";
+ const notes="拾光 Android 1.6.24\n\n自动收藏流程调整：识别原App收藏/保存动作后直接显示分类表单，不再先等待平台成功提示或先取链接。用户选分类并点击保存收藏后，自动尝试取得本次原内容链接并校验，成功后沿用已选分类和原因完成保存。微信公众号不再依赖“收藏成功”提示才能打开分类界面。\n\n取消自动流程中的独立手动分享引导、二次选择分类提示和额外提示卡片。取链接失败只在原表单内显示错误，保留分类和原因，允许重试或关闭。分类表单只显示一套标题和关闭按钮。普通分享不触发收藏，缺少有效原链接不写入占位收藏；标题封面补全仍沿用已有逻辑。\n\n取链接时仍可能短暂显示原App菜单，无法保证第三方App隐藏的控件能被识别。已验证分类先行、失败不写入、重试保留分类及标题封面的自动测试；尚未在用户手机逐平台实测。覆盖安装后关闭并重新开启无障碍服务。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:false})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();

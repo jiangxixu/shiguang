@@ -1,14 +1,23 @@
 (function(){
  'use strict';
- let draft=null,resolveDraft,saving=false,persisted=false,owner=null,metadata=Promise.resolve();
+ let draft=null,resolveDraft,saving=false,persisted=false,owner=null,metadata=Promise.resolve(),resolveLink,rejectLink;
  const ready=new Promise(resolve=>resolveDraft=resolve);
  const report=data=>window.ShiguangQuickResult?.postMessage(JSON.stringify(data));
  window.shiguangReceiveShare=item=>{
+  if(item?.pending){if(draft)return;draft={pending:true,title:item.title||'选择分类后保存',platform:item.platform,url:''};const source=document.getElementById('platform');if(source)source.textContent='来源：'+(item.platform||'原应用');resolveDraft();return;}
   if(draft)return;draft=SG.normalize(item);if(draft&&!draft.thumbnail)draft.thumbnail=SG.thumbnailFor(draft);resolveDraft();
   if(draft){const source=document.getElementById('platform');if(source)source.textContent='来源：'+(SG.platforms[draft.platform]?.name||'其他网站');}
   function applyMetadata(meta){if(persisted)return;if(meta.thumbnail)draft.thumbnail=SG.safeImage(meta.thumbnail);if(meta.title&&ShiguangPreview.needsTitle(draft)){draft.title=String(meta.title).slice(0,500);document.getElementById('title').textContent=draft.title;}if(meta.requiresLogin)document.getElementById('status').textContent='小红书要求网页登录。可先保存原链接，再到拾光「我 → 登录小红书补全信息」，登录后补全封面。';}
   if(draft)metadata=Promise.race([ShiguangPreview.fetch(draft,applyMetadata),new Promise(resolve=>setTimeout(()=>resolve({}),12500))]).then(applyMetadata).catch(()=>{});
  };
+ window.shiguangReceiveResolvedShare=item=>{
+  if(!draft?.pending||!resolveLink)return;
+  const valid=SG.normalize(item);if(!valid){window.shiguangResolveFailed('未取得有效原链接，本次未保存');return;}
+  draft=null;window.shiguangReceiveShare(item);
+  document.getElementById('title').textContent=draft.title;document.getElementById('url').textContent=draft.url;
+  const done=resolveLink;resolveLink=null;rejectLink=null;done();
+ };
+ window.shiguangResolveFailed=message=>{if(rejectLink){const fail=rejectLink;resolveLink=null;rejectLink=null;fail(Error(message||'未取得原链接，本次未保存'));}};
  window.ShiguangCloseCapture=()=>report({cancel:true});
  window.ShiguangCaptureTransport={async sendMessage(message){
   await ready;if(!draft)throw Error('分享链接无效，请重新分享');
@@ -21,6 +30,7 @@
   if(message.type==='SHIGUANG_CAPTURE_SAVE'){
    if(saving)throw Error('正在保存，请稍候');if(localStorage.getItem('shiguang.cloud.owner')!==owner)throw Error('账号已切换，请重新分享');saving=true;
    try{
+    if(draft.pending)await new Promise((resolve,reject)=>{resolveLink=resolve;rejectLink=reject;report({resolve:true});});
     await metadata;
     if(localStorage.getItem('shiguang.cloud.owner')!==owner)throw Error('账号已切换，请重新分享');
     const result=ShiguangCapture.save(localStorage,[{...draft,tags:message.tags,notes:message.reason||''}]);

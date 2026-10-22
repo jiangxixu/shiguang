@@ -42,7 +42,7 @@ document.getElementById('cancel').onclick=()=>closeCapture();
 async function load(){
  try{
   const draft=await transport.sendMessage({type:'SHIGUANG_CAPTURE_GET',id});
-  if(draft?.error)throw Error(draft.error);if(!draft?.url)throw Error('未找到待收藏网页');
+  if(draft?.error)throw Error(draft.error);if(!draft?.url&&!draft?.pending)throw Error('未找到待收藏网页');
   document.getElementById('title').textContent=draft.title;document.getElementById('url').textContent=draft.url;
   known=[...new Set(draft.tags||[])];
   if(draft.selection){document.getElementById('excerpt').hidden=false;document.getElementById('selection').textContent=draft.selection;}
