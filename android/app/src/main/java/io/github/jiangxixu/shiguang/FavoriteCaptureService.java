@@ -33,13 +33,22 @@ public class FavoriteCaptureService extends AccessibilityService {
     private AccessibilityNodeInfo boundFavorite;
     private final Runnable sample=new Runnable(){public void run(){
         if(!enabled(FavoriteCaptureService.this)||phase!=0)return;
+        try{
         AccessibilityNodeInfo root=getRootInActiveWindow();
         if(sampleReadiness.retry(SystemClock.elapsedRealtime(),root!=null)){handler.postDelayed(this,250);return;}
         String pkg=root==null?"":text(root.getPackageName());
         if(!FavoriteRules.supported(pkg)){transitions.clear();menuOrigin.clear();observedPackage="";handler.postDelayed(this,1000);return;}
         observe(pkg);
         if(phase==0)handler.postDelayed(this,500);
+        }catch(RuntimeException error){reset();state("页面检测异常，已重新等待收藏："+error.getClass().getSimpleName());}
     }};
+    private final CaptureEventBuffer<AccessibilityEvent> contentEvents=new CaptureEventBuffer<>(AccessibilityEvent::recycle);
+    private long lastEventAt,eventCount;
+    private String lastEventPackage="";
+    private final Runnable drainContent=()->{
+        AccessibilityEvent event=contentEvents.take();if(event==null)return;
+        try{handleSafely(event);}finally{event.recycle();}
+    };
     private static FavoriteCaptureService instance;
     static boolean active(){return instance!=null;}
     static String status(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getString("status","尚未检测到收藏操作");}
@@ -50,7 +59,14 @@ public class FavoriteCaptureService extends AccessibilityService {
         history.append(line);getPrefs(c).edit().putString("status",line).putString("history",history.toString()).apply();
     }
     static String history(Context c){
-        StringBuilder out=new StringBuilder(getPrefs(c).getString("history","暂无检测记录"));boolean found=false;
+        StringBuilder out=new StringBuilder();
+        FavoriteCaptureService service=instance;
+        if(service!=null){
+            out.append("本次连接收到事件：").append(service.eventCount).append("\n");
+            out.append("最近事件：").append(service.lastEventAt==0?"尚未收到":((SystemClock.elapsedRealtime()-service.lastEventAt)/1000)+"秒前 · "+service.lastEventPackage).append("\n");
+            out.append("检测阶段：").append(service.phase==0?"等待收藏":service.phase==1?"等待原内容返回":service.phase==2?"取得原链接":service.phase==3?"校验原链接":service.phase==4?"适配按钮":"分类窗口").append(service.samplingInterrupted?" · 已中断":"").append("\n\n");
+        }
+        out.append(getPrefs(c).getString("history","暂无检测记录"));boolean found=false;
         for(String pkg:FavoriteRules.PACKAGES){String data=getPrefs(c).getString("pageDiagnostic:"+pkg,"");if(!data.isEmpty()){out.append("\n\n").append(data);found=true;}}
         if(!found)out.append("\n\n").append(getPrefs(c).getString("pageDiagnostic",""));return out.toString();
     }
@@ -59,10 +75,33 @@ public class FavoriteCaptureService extends AccessibilityService {
     private void state(String text){report(this,text);}
     static boolean enabled(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getBoolean("enabled",false);}
     static void pause(Context c){c.getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();if(instance!=null){instance.reset();instance.disableSelf();}}
-    @Override protected void onServiceConnected(){instance=this;samplingInterrupted=false;reset();state("服务已连接，等待已支持平台的收藏/保存操作");}
-    private void reset(){handler.removeCallbacksAndMessages(null);if(captureOverlay!=null){captureOverlay.dismiss();captureOverlay=null;}if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingFavoriteSelector="";shareReadiness.reset();sampleReadiness.reset();pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();menuOrigin.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;boundFavorite=null;if(instance==this&&enabled(this))handler.postDelayed(sample,200);}
+    @Override protected void onServiceConnected(){instance=this;samplingInterrupted=false;eventCount=0;lastEventAt=0;lastEventPackage="";reset();state("服务已连接，等待已支持平台的收藏/保存操作");}
+    private void reset(){handler.removeCallbacksAndMessages(null);contentEvents.clear();if(captureOverlay!=null){captureOverlay.dismiss();captureOverlay=null;}if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingFavoriteSelector="";shareReadiness.reset();sampleReadiness.reset();pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();menuOrigin.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;boundFavorite=null;if(instance==this&&enabled(this))handler.postDelayed(sample,200);}
     private String text(CharSequence value){return value==null?"":value.toString();}
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
+        if(event==null)return;
+        String pkg=text(event.getPackageName());
+        if(FavoriteRules.supported(pkg)){lastEventAt=SystemClock.elapsedRealtime();lastEventPackage=pkg;eventCount++;}
+        if(!enabled(this)){reset();return;}
+        if(!FavoriteRules.supported(pkg))return;
+        boolean receipt=FavoriteRules.confirmedSuccess(text(event.getContentDescription()));
+        for(CharSequence value:event.getText())receipt|=FavoriteRules.confirmedSuccess(text(value));
+        if(phase==0&&event.getEventType()==AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED&&!receipt){
+            if(contentEvents.offer(AccessibilityEvent.obtain(event),pkg+":"+event.getWindowId())){
+                handler.removeCallbacks(drainContent);handler.postDelayed(drainContent,80);
+            }
+            return;
+        }
+        // Clicks, success receipts and window changes run immediately. Do not replay
+        // an older content event after a user action or a navigation boundary.
+        handler.removeCallbacks(drainContent);contentEvents.clear();handleSafely(event);
+    }
+    private void handleSafely(AccessibilityEvent event){
+        try{handleEvent(event);}catch(RuntimeException error){
+            reset();state("检测发生异常，已重新等待收藏："+error.getClass().getSimpleName());
+        }
+    }
+    private void handleEvent(AccessibilityEvent event){
         if(!enabled(this)){reset();return;}
         if(samplingInterrupted){samplingInterrupted=false;handler.removeCallbacks(sample);handler.post(sample);state("已重新收到系统事件，自动检测已恢复");}
         String pkg=text(event.getPackageName());if(!FavoriteRules.supported(pkg))return;
@@ -109,6 +148,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             // Sharing by itself is not a collection request. Disarm any prior
             // observation so opening a share sheet cannot start a capture.
             AccessibilityNodeInfo clickedControl=event.getSource();
+            if(phase==0){AccessibilityNodeInfo current=platformRoot(pkg);boundFavorite=FavoriteBindings.find(this,pkg,"favorite",current,nodes(current));}
             boolean videoMenu=phase==0&&(("com.google.android.youtube".equals(pkg)&&youtubeOverflow(clickedControl))||("com.tencent.mm".equals(pkg)&&wechatMoreControl(clickedControl)));
             if(phase==0&&!videoMenu&&!favoriteNode(favoriteSource(clickedControl))&&shareSource(clickedControl,pkg)){
                 transitions.clear();menuOrigin.clear();lastClick=0;lastClickPackage="";return;
@@ -611,5 +651,8 @@ public class FavoriteCaptureService extends AccessibilityService {
         String platform=pendingPackage;reset();state(FavoriteRules.platformName(platform)+" · "+message);
     }
     @Override public void onInterrupt(){reset();handler.removeCallbacks(sample);samplingInterrupted=true;state("服务被系统中断，收到后续事件将恢复检测；若持续无反应请检查无障碍设置");}
+    @Override public boolean onUnbind(Intent intent){
+        if(instance==this)instance=null;reset();state("系统已断开收藏检测服务，请检查无障碍连接");return super.onUnbind(intent);
+    }
     @Override public void onDestroy(){if(instance==this)instance=null;reset();super.onDestroy();}
 }

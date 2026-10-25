@@ -8,8 +8,8 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.26 恢复版\n\n针对更新后所有平台收藏无反应的反馈，撤回1.6.25的脱离窗口继续运行WebView的改动，恢复此前窗口关闭和释放方式。分类页面加载失败或渲染进程退出时结束本次任务，恢复后续收藏检测。\n\n保留有效原链接和分类先写入本机的保护。暂时恢复保存后等待补全/同步的流程。收藏、账号及本机按钮适配记录不会被清除。\n\n自动测试和构建不等于真机验证；目前尚未取得故障手机的最新检测记录，不能确认这是所有平台失效的实际原因。请覆盖安装，不要卸载；若系统无障碍服务未连接，请在系统设置重新连接拾光。";
- const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:false})});
+ const notes="拾光 Android 1.6.27 · 事件处理测试版\n\n参考GKD对密集界面事件的过滤/合并思路，独立实现单窗口内容事件合并。点击、收藏成功提示、窗口切换立即处理，不进入内容事件等待队列。移除系统统一100毫秒通知等待，由拾光仅对普通内容变化合并80毫秒批次。\n\n分享排除判断前刷新当前页面收藏按钮适配，避免使用上一页的匹配对象。系统断开服务时清理连接状态；异常记录原因并重新开始检测。检测记录增加事件数量、最近事件时间和当前阶段，便于区分系统未送达事件和页面未匹配。\n\n已研究Shizuku官方API，本版没有接入Shizuku，也不要求新增授权。Shizuku本身不能提供第三方平台私有收藏链接。\n\n本版为未完成iQOO真机验证的测试版；不承诺已解决所有平台失效、标题或封面问题。覆盖安装，保留已有数据和适配记录。\n\n参考来源：https://github.com/gkd-kit/gkd ，https://github.com/RikkaApps/Shizuku-API";
+ const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:true})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();
  for(const [name,type] of [['shiguang-android.apk','application/vnd.android.package-archive'],['shiguang-collector.zip','application/zip'],['SHA256SUMS.txt','text/plain']]){
