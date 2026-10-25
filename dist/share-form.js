@@ -46,7 +46,7 @@
     const result=ShiguangCapture.save(localStorage,[{...draft,tags:message.tags,notes:message.reason||''}]);
     persisted=true;
     report({saved:true});
-    // Native hosts detach the editor on saved, keeping this bounded job alive.
+    // Keep the editor alive while metadata and synchronization finish.
     // The durable library itself is the retry source on the next app launch.
     await metadata;
     if(localStorage.getItem('shiguang.cloud.owner')!==owner){report({done:true,cloud:false});return {ok:true};}

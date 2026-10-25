@@ -50,13 +50,11 @@ final class FavoriteCaptureOverlay {
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         WebViewAssetLoader loader=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(service)).build();
         WebViewCompat.addWebMessageListener(web,"ShiguangQuickResult",Collections.singleton("https://appassets.androidplatform.net"),(v,message,origin,main,reply)->{
-            if(!main||!"https://appassets.androidplatform.net".equals(origin.toString()))return;
+            if(closed||!main||!"https://appassets.androidplatform.net".equals(origin.toString()))return;
             try{JSONObject data=new JSONObject(message.getData());
-                if(CaptureCompletion.owns(v)){if(data.optBoolean("done")||data.optBoolean("error"))CaptureCompletion.finish(v);return;}
-                if(closed)return;
                 if(data.optBoolean("resolve")&&pendingMode&&!resolving){resolving=true;if(attached){service.getSystemService(WindowManager.class).removeView(container);attached=false;}requestLink.run();return;}
                 if(data.optBoolean("cancel")){finish("已取消，本次未保存");return;}
-                if(data.optBoolean("saved")){saved=true;CaptureCompletion.retain(web);web=null;finish("已保存在手机，正在后台补全与同步");return;}
+                if(data.optBoolean("saved")){saved=true;status.setText("已保存，正在同步…");handler.postDelayed(()->finish("已保存在手机，打开拾光后可继续同步"),10000);}
                 if(data.optBoolean("done"))finish(data.optBoolean("duplicate")?"已补全已有收藏":data.optBoolean("cloud")?"已收进拾光并同步":"已保存在手机，联网登录后自动同步");
                 if(data.optBoolean("error"))finish("保存失败，请打开拾光检查存储");
             }catch(Exception ignored){}
@@ -64,6 +62,12 @@ final class FavoriteCaptureOverlay {
         web.setWebViewClient(new WebViewClient(){
             @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest request){WebResourceResponse response=loader.shouldInterceptRequest(request.getUrl());if(response!=null)return response;if("https".equals(request.getUrl().getScheme())&&"pkgsgkrjhcckmcjqdzws.supabase.co".equals(request.getUrl().getHost()))return null;return new WebResourceResponse("text/plain","UTF-8",new java.io.ByteArrayInputStream(new byte[0]));}
             @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest request){return true;}
+            @Override public void onReceivedError(WebView v,WebResourceRequest request,WebResourceError error){
+                if(request.isForMainFrame()&&!closed)finish("分类页面加载失败（"+error.getErrorCode()+"），已恢复收藏检测，请重试");
+            }
+            @Override public boolean onRenderProcessGone(WebView v,RenderProcessGoneDetail detail){
+                finish(saved?"已保存在手机；分类页面已关闭":"分类页面进程退出，已恢复收藏检测，请重试");return true;
+            }
             @Override public void onPageFinished(WebView v,String url){if(HOME.equals(url)&&!closed){loaded=true;deliver();}}
         });
         PreviewBridge.install(service,web);
@@ -105,6 +109,6 @@ final class FavoriteCaptureOverlay {
     }
     private void deliver(){if(!closed&&loaded&&payload!=null&&!started){started=true;web.evaluateJavascript("window.shiguangReceiveShare("+payload+")",null);}}
     private void unavailable(String text){if(closed)return;if(pendingMode){linkFailed("未取得这篇内容的原链接，未保存。分类已保留，可重试。");return;}status.setText(text);fallback.setVisibility(View.VISIBLE);FavoriteCaptureService.report(service,text);}
-    private void finish(String message){if(closed)return;dismiss();result.finish(message);}
-    void dismiss(){if(closed)return;closed=true;handler.removeCallbacksAndMessages(null);if(container!=null&&attached)try{service.getSystemService(WindowManager.class).removeView(container);attached=false;}catch(Exception ignored){}if(web!=null){web.stopLoading();web.destroy();web=null;}}
+    private void finish(String message){if(closed)return;try{dismiss();}finally{result.finish(message);}}
+    void dismiss(){if(closed)return;closed=true;handler.removeCallbacksAndMessages(null);if(container!=null&&attached)try{service.getSystemService(WindowManager.class).removeView(container);attached=false;}catch(Exception ignored){}if(web!=null){WebView closing=web;web=null;try{closing.stopLoading();}catch(RuntimeException ignored){}try{closing.destroy();}catch(RuntimeException ignored){}}}
 }
