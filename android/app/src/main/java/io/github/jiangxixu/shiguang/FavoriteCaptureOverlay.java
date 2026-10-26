@@ -54,7 +54,7 @@ final class FavoriteCaptureOverlay {
             try{JSONObject data=new JSONObject(message.getData());
                 if(data.optBoolean("resolve")&&pendingMode&&!resolving){resolving=true;if(attached){service.getSystemService(WindowManager.class).removeView(container);attached=false;}requestLink.run();return;}
                 if(data.optBoolean("cancel")){finish("已取消，本次未保存");return;}
-                if(data.optBoolean("saved")){saved=true;status.setText("已保存，正在同步…");handler.postDelayed(()->finish("已保存在手机，打开拾光后可继续同步"),10000);}
+                if(data.optBoolean("saved")){saved=true;if(data.optBoolean("background")){finish("已保存在手机，后台补全并同步");return;}status.setText("已保存，正在同步…");handler.postDelayed(()->finish("已保存在手机，打开拾光后可继续同步"),10000);}
                 if(data.optBoolean("done"))finish(data.optBoolean("duplicate")?"已补全已有收藏":data.optBoolean("cloud")?"已收进拾光并同步":"已保存在手机，联网登录后自动同步");
                 if(data.optBoolean("error"))finish("保存失败，请打开拾光检查存储");
             }catch(Exception ignored){}
@@ -71,6 +71,7 @@ final class FavoriteCaptureOverlay {
             @Override public void onPageFinished(WebView v,String url){if(HOME.equals(url)&&!closed){loaded=true;deliver();}}
         });
         PreviewBridge.install(service,web);
+        CaptureBackgroundWork.install(service,web);
         android.util.DisplayMetrics m=service.getResources().getDisplayMetrics();
         WindowManager.LayoutParams params=new WindowManager.LayoutParams(m.widthPixels,Math.min((int)(680*m.density),(int)(m.heightPixels*.88)),WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,WindowManager.LayoutParams.FLAG_DIM_BEHIND,PixelFormat.TRANSLUCENT);
         params.gravity=Gravity.BOTTOM;params.dimAmount=.2f;params.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;

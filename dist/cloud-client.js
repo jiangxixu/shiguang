@@ -26,6 +26,7 @@
   await api.ready;
   const {data,error}=await client.auth.getSession();if(error)throw error;
   if(!data.session){status('登录后自动同步');return {signedIn:false};}
+  if(root.ShiguangBackgroundRunner&&localStorage.getItem(OWNER)!==data.session.user.id)return {signedIn:false};
   bind(data.session.user);const uid=user.id;
   status('正在同步…');
   const initial=observe(uid),snapshot={...initial.pending};
@@ -55,7 +56,7 @@
   const work=()=>run();
   active=(navigator.locks?navigator.locks.request('shiguang-cloud-sync',work):work()).catch(error=>{status('暂未同步，内容保存在本机');throw error;}).finally(()=>{active=null;});return active;
  }
- function schedule(){clearTimeout(debounce);debounce=setTimeout(()=>sync().catch(()=>{}),700);}
+ function schedule(){if(root.ShiguangBackgroundRunner)return;clearTimeout(debounce);debounce=setTimeout(()=>sync().catch(()=>{}),700);}
  const api={client,user,message:'登录后自动同步',sync,schedule,
   async requestCode(email){const {error}=await client.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:'https://jiangxixu.github.io/shiguang/'}});if(error)throw error;},
   async verifyCode(email,token){const {data,error}=await client.auth.verifyOtp(ShiguangAuthInput.parse(token,config.url,email));if(error)throw error;bind(data.user);await sync();},
@@ -70,10 +71,10 @@
   }
  };
  root.ShiguangCloud=api;
- api.ready=client.auth.getSession().then(({data,error})=>{if(error)throw error;if(data.session)bind(data.session.user);status(user?'已登录，正在准备同步':'登录后自动同步');}).catch(()=>status('暂未连接云端，收藏保存在本机'));
+ api.ready=client.auth.getSession().then(({data,error})=>{if(error)throw error;if(data.session&&(!root.ShiguangBackgroundRunner||localStorage.getItem(OWNER)===data.session.user.id))bind(data.session.user);status(user?'已登录，正在准备同步':'登录后自动同步');}).catch(()=>status('暂未连接云端，收藏保存在本机'));
  client.auth.onAuthStateChange((event,session)=>{if(session){user=session.user;api.user=user;}if(event==='SIGNED_IN'||event==='TOKEN_REFRESHED')schedule();});
  root.addEventListener('online',schedule);root.addEventListener('shiguang-local-change',schedule);
  root.addEventListener('storage',event=>{if(event.key===KEY)schedule();});
  root.addEventListener('focus',schedule);
- if(!location.pathname.endsWith('quick-share.html')){api.ready.then(schedule);setInterval(()=>{if(document.visibilityState==='visible')schedule();},30000);}
+ if(!root.ShiguangBackgroundRunner&&!location.pathname.endsWith('quick-share.html')){api.ready.then(schedule);setInterval(()=>{if(document.visibilityState==='visible')schedule();},30000);}
 })(window);

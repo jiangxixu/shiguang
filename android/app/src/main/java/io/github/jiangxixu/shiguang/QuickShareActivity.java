@@ -64,7 +64,7 @@ public class QuickShareActivity extends Activity {
             try{
                 JSONObject report=new JSONObject(message.getData());
                 if(report.optBoolean("cancel")){setResult(RESULT_CANCELED);finish();return;}
-                if(report.optBoolean("saved")){locallySaved=true;handler.postDelayed(timeout,10000);}
+                if(report.optBoolean("saved")){locallySaved=true;if(report.optBoolean("background")){done=true;setResult(RESULT_OK);finish();return;}handler.postDelayed(timeout,10000);}
                 if(report.optBoolean("done"))complete(report.optBoolean("duplicate")?"拾光中已收藏过这条内容":report.optBoolean("cloud")?"已收进拾光并同步到云端":"已保存在手机，联网登录后自动同步",locallySaved);
                 if(report.optBoolean("error"))complete("未保存：存储异常，请打开拾光检查或备份",false);
             }catch(Exception ignored){}
@@ -79,6 +79,7 @@ public class QuickShareActivity extends Activity {
             }
         });
         PreviewBridge.install(this,web);
+        CaptureBackgroundWork.install(this,web);
         web.loadUrl(HOME);
     }
     private void complete(String message,boolean success){

@@ -98,6 +98,7 @@ public class MainActivity extends Activity {
         }
         web.setDownloadListener((url,ua,disposition,mime,length)->{if(url.startsWith("https://"))external(Uri.parse(url));else Toast.makeText(this,"请更新 Android System WebView 后重试导出",Toast.LENGTH_LONG).show();});
         PreviewBridge.install(this,web);
+        CaptureBackgroundWork.install(this,web);
         loadIntent(getIntent());
     }
     private void updateAutoState(){

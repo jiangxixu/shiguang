@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.27 · 事件处理测试版\n\n参考GKD对密集界面事件的过滤/合并思路，独立实现单窗口内容事件合并。点击、收藏成功提示、窗口切换立即处理，不进入内容事件等待队列。移除系统统一100毫秒通知等待，由拾光仅对普通内容变化合并80毫秒批次。\n\n分享排除判断前刷新当前页面收藏按钮适配，避免使用上一页的匹配对象。系统断开服务时清理连接状态；异常记录原因并重新开始检测。检测记录增加事件数量、最近事件时间和当前阶段，便于区分系统未送达事件和页面未匹配。\n\n已研究Shizuku官方API，本版没有接入Shizuku，也不要求新增授权。Shizuku本身不能提供第三方平台私有收藏链接。\n\n本版为未完成iQOO真机验证的测试版；不承诺已解决所有平台失效、标题或封面问题。覆盖安装，保留已有数据和适配记录。\n\n参考来源：https://github.com/gkd-kit/gkd ，https://github.com/RikkaApps/Shizuku-API";
+ const notes="拾光 Android 1.6.28 · 后台补全与同步\n\n本版仅优化取得有效原链接后的保存阶段，保留 1.6.27 的收藏/保存识别及自动取链接流程。\n\n原链接、分类及原因先写入本机；后台任务经 WorkManager 持久化确认后，立即关闭分类界面，不再等待标题/封面和云端同步，不再显示同步等待窗口。后台使用独立执行器，关闭分类界面不会取消任务；断网重试，进程重启后由系统恢复调度。\n\n后台只补全缺失标题及封面，保留手动修改、分类和原因，不恢复已删除记录；任务按账号隔离。未登录先保存在本机。系统省电、强制停止及网络限制仍会影响后台执行时机。\n\n此项不取消自动打开分享/复制链接的前台操作，取得原链接期间仍需短暂等待。原平台需要登录才能返回的标题/封面，后台也无法保证获取。\n\n已通过自动测试与构建检查；尚未完成 iQOO 真机验收。请覆盖安装，不要卸载旧版，以保留已有数据、登录和按钮适配。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:true})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();
