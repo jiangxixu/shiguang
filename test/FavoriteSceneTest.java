@@ -12,6 +12,11 @@ public class FavoriteSceneTest {
         check(!scene.matches(7,"folder-picker")); // a picker may also share the content window
         check(scene.matches(7,"original-video-title")); // returns to original after confirmation
         check(!scene.matches(7,"next-video-title")); // scrolling must not capture the next video
+        scene.start(7,"原视频正文 #科普",1000);
+        check(scene.contains(7,java.util.Arrays.asList("原视频正文 #科普 展开"),"原视频正文 #科普"));
+        check(!scene.contains(7,java.util.Arrays.asList("下一条视频 #科普 展开"),"下一条视频 #科普"));
+        check(!scene.contains(8,java.util.Arrays.asList("原视频正文 #科普 展开"),"原视频正文 #科普"));
+        check(!scene.contains(7,java.util.Arrays.asList("原视频正文 #科普 展开"),""));
         check(!scene.expired(17999));check(scene.expired(18000)); // fixed deadline
         scene.start(7,"",20000);check(!scene.tracked());check(!scene.matches(7,"")); // no guessing
         scene.clear();check(!scene.matches(7,"original-video-title"));

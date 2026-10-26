@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.29 · 抖音精选适配\n\n加入抖音精选（com.ss.android.yumme.video）的无障碍事件监听，接入现有收藏识别、分类、有效原链接校验和后台保存流程。\n\n我 → 适配本机按钮新增“抖音精选”入口。精选版按钮适配和诊断记录独立保存，避免与普通抖音相互覆盖；已有平台适配记录不变。抖音视频链接增加精选版作为已安装应用的打开候选。\n\n继续保留 1.6.28 的后台补全标题/封面与云端同步。分享按钮不会作为收藏触发入口；仅收藏确认后自动尝试取链接。\n\n自动测试及 Android 构建通过后发布；尚未在用户 iQOO 的抖音精选版本实测。覆盖安装保留数据和登录；如果系统仍使用旧监听配置，可关闭并重新开启拾光无障碍服务后重试。";
+ const notes="拾光 Android 1.6.30 · 抖音精选底部分享入口\n\n按用户提供的竖屏详情页适配：底部右侧分享圆按钮位于全屏按钮左侧。已有语义/适配规则未能确定唯一分享按钮时，检查当前页面的实际可点击控件及相邻按钮布局，只在抖音精选、原内容核对通过且右侧收藏栏存在时启用。不会直接按固定像素坐标点击；布局不符或多个候选时停止。复制后仍校验本次新链接。\n\n修复标题提取移除“展开”后，与原始页面文字比较不一致导致的原内容误判；仍保持同窗口和精确标题检查，不接受其他视频。保留后台补全与同步。\n\n新增截图布局比例、嵌套控件、全屏/稍后再看排除、歧义拒绝及标题一致性测试。构建通过后发布，尚未在用户 iQOO 真机验证。覆盖安装保留数据。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:true})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();

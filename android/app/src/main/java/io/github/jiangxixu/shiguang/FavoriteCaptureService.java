@@ -442,7 +442,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             values.add(text(node.getText()).trim().replaceAll("\\s+"," "));
             values.add(text(node.getContentDescription()).trim().replaceAll("\\s+"," "));
         }
-        return scene.contains(page.getWindowId(),values);
+        return scene.contains(page.getWindowId(),values,sourceTitle(page));
     }
     private void confirmSaved(){
         if(phase!=1||!enabled(this))return;
@@ -495,8 +495,32 @@ public class FavoriteCaptureService extends AccessibilityService {
                 android.graphics.Rect bounds=new android.graphics.Rect();target.getBoundsInScreen(bounds);matches.put(bounds.toString(),target);
             }
         }
-        // Ambiguous controls are deliberately not clicked.
-        return matches.size()==1?matches.values().iterator().next():(!copy?zhihuToolbar(matches.values(),root):null);
+        if(matches.size()==1)return matches.values().iterator().next();
+        if(!copy){
+            AccessibilityNodeInfo selected=douyinSelectedShare(root);
+            if(selected!=null)return selected;
+            return zhihuToolbar(matches.values(),root);
+        }
+        return null;
+    }
+    private AccessibilityNodeInfo douyinSelectedShare(AccessibilityNodeInfo page){
+        if(phase!=1||!"com.ss.android.yumme.video".equals(pendingPackage)||page==null||!sameScene(page))return null;
+        android.graphics.Rect screen=new android.graphics.Rect();page.getBoundsInScreen(screen);
+        List<AccessibilityNodeInfo> candidates=new ArrayList<>();List<DouyinSelectedLayout.Box> boxes=new ArrayList<>();
+        boolean favoriteRail=false;
+        for(AccessibilityNodeInfo node:nodes(page)){
+            android.graphics.Rect r=new android.graphics.Rect();node.getBoundsInScreen(r);
+            if(screen.width()<=0||screen.height()<=0)continue;
+            double x=(r.exactCenterX()-screen.left)/screen.width(),y=(r.exactCenterY()-screen.top)/screen.height();
+            if(favoriteNode(node)&&x>.83&&y>.58&&y<.91)favoriteRail=true;
+            if(!node.isClickable()||!node.isVisibleToUser()||!node.isEnabled()||node.isEditable()||node.isPassword())continue;
+            String label=text(node.getText())+" "+text(node.getContentDescription());
+            boolean excluded=label.matches("(?is).*(?:全屏|稍后|推荐|搜索|点赞|收藏|评论|fullscreen|watch.?later|search|like|comment).*" );
+            candidates.add(node);boxes.add(new DouyinSelectedLayout.Box(r.left-screen.left,r.top-screen.top,r.right-screen.left,r.bottom-screen.top,excluded));
+        }
+        if(!favoriteRail)return null;
+        int index=DouyinSelectedLayout.select(boxes,screen.width(),screen.height());
+        return index<0?null:candidates.get(index);
     }
     private boolean clickNode(AccessibilityNodeInfo node){
         if(node==null||!node.isVisibleToUser()||!node.isEnabled()||node.isEditable()||node.isPassword())return false;
@@ -532,6 +556,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(!zhihuMoreOpened){String rule=FavoriteBindings.capture(page,control(share));if(rule!=null)pendingShareRule=rule;}
         phase=2;copyTimeout=8000;copyStarted=SystemClock.elapsedRealtime();
         state(zhihuMoreOpened?"正在自动打开知乎更多菜单并取得原链接":"已识别收藏状态，正在从原平台取得链接");
+        if("com.ss.android.yumme.video".equals(pendingPackage))state("抖音精选 · 已定位分享控件，正在打开菜单");
         if(!clickNode(share)){fail("无法打开分享菜单，本次未保存");return;}
         handler.postDelayed(pollCopy,300);
     }
