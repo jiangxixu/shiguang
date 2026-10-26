@@ -583,7 +583,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             if(count>=70||out.length()>10000)break;
         }
         out.append("匹配区域控件数：").append(count);
-        getPrefs(this).edit().putString("pageDiagnostic:"+FavoriteRules.PACKAGES[FavoriteRules.platform(pkg)],out.toString()).apply();
+        getPrefs(this).edit().putString("pageDiagnostic:"+FavoriteRules.bindingProfile(pkg),out.toString()).apply();
     }
     private void manualShare(){
         recordPageDiagnostic();
@@ -606,7 +606,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         handler.postDelayed(()->fail("按钮适配已超时，请重新开始"),60000);
     }
     private void learnClick(AccessibilityEvent event,String pkg){
-        if(!learningArmed||!FavoriteRules.samePlatform(pendingPackage,pkg))return;
+        if(!learningArmed||!FavoriteRules.bindingProfile(pendingPackage).equals(FavoriteRules.bindingProfile(pkg)))return;
         if(event.getEventType()!=AccessibilityEvent.TYPE_VIEW_CLICKED&&event.getEventType()!=AccessibilityEvent.TYPE_VIEW_LONG_CLICKED)return;
         AccessibilityNodeInfo target=event.getSource();if(target==null){state("系统未提供点击控件，请再点一次按钮");return;}
         target=control(target);AccessibilityNodeInfo page=target;

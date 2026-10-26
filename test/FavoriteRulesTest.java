@@ -59,6 +59,18 @@ public class FavoriteRulesTest {
         check(FavoriteRules.pendingSuccess(youtube,"Saved"));check(FavoriteRules.pendingSuccess(youtube,"已保存"));
         check(!FavoriteRules.confirmedSuccess("Saved"));check(!FavoriteRules.pendingSuccess(youtube,"Save"));
         check(!FavoriteRules.pendingSuccess(youtube,"已从播放列表移除"));check(!FavoriteRules.pendingSuccess(douyin,"Saved"));
+        String selected="com.ss.android.yumme.video";
+        check(FavoriteRules.supported(selected));check(FavoriteRules.platform(selected)==3);
+        check(FavoriteRules.platformName(selected).equals("抖音精选"));
+        check(!FavoriteRules.bindingProfile(selected).equals(FavoriteRules.bindingProfile(douyin)));
+        check(FavoriteRules.bindingProfile("com.ss.android.ugc.aweme.lite").equals(FavoriteRules.bindingProfile(douyin)));
+        check(FavoriteRules.contentUrl(selected,"https://v.douyin.com/AbC123/"));
+        check(FavoriteRules.contentUrl(selected,"https://www.douyin.com/video/123456"));
+        check(!FavoriteRules.contentUrl(selected,"https://www.douyin.com/user/123456"));
+        check(!FavoriteRules.contentUrl(selected,"https://youtu.be/AbC123_-xyZ"));
+        check(FavoriteRules.copyForPlatform(selected,"分享链接"));
+        check(FavoriteRules.roleId(selected,selected+":id/collect","favorite"));
+        check(!FavoriteRules.roleId(selected,douyin+":id/collect","favorite"));
         System.out.println("Favorite/cancel distinction and real platform-content URL validation passed.");
     }
 }

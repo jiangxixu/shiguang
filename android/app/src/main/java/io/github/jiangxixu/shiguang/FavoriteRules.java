@@ -3,10 +3,11 @@ import java.net.URI;
 
 /** Strictly bounded to known apps and real content URLs, never a platform homepage. */
 final class FavoriteRules {
-    static final String[] PLATFORMS={"小红书","B站","知乎","抖音","YouTube","微信公众号"};
-    static final String[] PACKAGES={"com.xingin.xhs","tv.danmaku.bili","com.zhihu.android","com.ss.android.ugc.aweme","com.google.android.youtube","com.tencent.mm"};
+    static final String[] PLATFORMS={"小红书","B站","知乎","抖音","YouTube","微信公众号","抖音精选"};
+    static final String[] PACKAGES={"com.xingin.xhs","tv.danmaku.bili","com.zhihu.android","com.ss.android.ugc.aweme","com.google.android.youtube","com.tencent.mm","com.ss.android.yumme.video"};
     static int platform(String pkg){
         if(pkg==null)return -1;
+        if(pkg.equals("com.ss.android.yumme.video"))return 3;
         for(int i=0;i<PACKAGES.length;i++)if(PACKAGES[i].equals(pkg))return i;
         if(pkg.equals("com.bilibili.app.in")||pkg.equals("tv.danmaku.bilibilihd"))return 1;
         if(pkg.equals("com.ss.android.ugc.aweme.lite"))return 3;
@@ -14,7 +15,8 @@ final class FavoriteRules {
     }
     static boolean supported(String pkg){return platform(pkg)>=0;}
     static boolean samePlatform(String a,String b){return platform(a)>=0&&platform(a)==platform(b);}
-    static String platformName(String pkg){int p=platform(pkg);return p<0?"原 App":PLATFORMS[p];}
+    static String bindingProfile(String pkg){if("com.ss.android.yumme.video".equals(pkg))return pkg;int p=platform(pkg);return p>=0?PACKAGES[p]:pkg;}
+    static String platformName(String pkg){if("com.ss.android.yumme.video".equals(pkg))return "抖音精选";int p=platform(pkg);return p<0?"原 App":PLATFORMS[p];}
     static boolean shareSheet(String pkg){return "android".equals(pkg)||"com.android.intentresolver".equals(pkg)||"com.google.android.intentresolver".equals(pkg);}
     static String clean(String s){return s==null?"":s.replaceAll("\\s+","").trim();}
     private static String control(String label){return clean(label).replaceAll("[,，](?:按钮|未选中|已选中|双击激活|点按两次即可激活|(?i:button|notselected|selected|doubletaptoactivate))","");}

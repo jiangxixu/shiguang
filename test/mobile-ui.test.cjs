@@ -7,7 +7,7 @@ test('every calibratable platform and supported variant is included in the acces
  const allowed=new Set(xml.match(/android:packageNames="([^"]+)"/)[1].split(','));
  const primary=[...rules.match(/PACKAGES=\{([^}]+)\}/)[1].matchAll(/"([^"]+)"/g)].map(x=>x[1]);
  const variants=[...rules.matchAll(/pkg\.equals\("([^"]+)"\)/g)].map(x=>x[1]);
- assert.equal(primary.length,6);
+ assert.equal(primary.length,7);
  assert.deepEqual(allowed,new Set([...primary,...variants]));
  const activity=fs.readFileSync(java+'MainActivity.java','utf8');
  assert.match(activity,/setItems\(FavoriteRules.PLATFORMS/);
@@ -36,9 +36,9 @@ test('native capture setup sends only the action explicitly tapped; website hide
  let html='',sent=[];const controls={};
  const actions=['enableAutoCapture','disableAutoCapture','autoCaptureDiagnostics','calibrateAutoCapture','xhsMetadataLogin','xhsMetadataDisable'];
  const buttons=actions.map(action=>({dataset:{nativeAction:action}}));
- const context={items:[],storageFailed:false,window:{ShiguangNative:{postMessage:raw=>sent.push(JSON.parse(raw))}},document:{documentElement:{dataset:{appVersion:'1.6.28'}},querySelectorAll:()=>buttons},esc:x=>x,openModal:(title,body)=>html=body,$:id=>controls[id]??={},backup(){},importDialog(){}};
+ const context={items:[],storageFailed:false,window:{ShiguangNative:{postMessage:raw=>sent.push(JSON.parse(raw))}},document:{documentElement:{dataset:{appVersion:'1.6.29'}},querySelectorAll:()=>buttons},esc:x=>x,openModal:(title,body)=>html=body,$:id=>controls[id]??={},backup(){},importDialog(){}};
  vm.runInNewContext(source+';settings()',context);
- assert.match(html,/Android 1.6.28/);assert.match(html,/查看检测记录/);assert.doesNotMatch(html,/悬浮收藏球|下拉快捷按钮|桌面快捷收藏|从复制的链接收藏/);assert.equal(sent.length,0);
+ assert.match(html,/Android 1.6.29/);assert.match(html,/查看检测记录/);assert.doesNotMatch(html,/悬浮收藏球|下拉快捷按钮|桌面快捷收藏|从复制的链接收藏/);assert.equal(sent.length,0);
  buttons.forEach(button=>button.onclick());
  assert.deepEqual(sent,actions.map(action=>({action})));
  context.window={};vm.runInNewContext('settings()',context);assert.ok(!html.includes('data-native-action'));
