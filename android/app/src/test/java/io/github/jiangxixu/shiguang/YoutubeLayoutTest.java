@@ -30,4 +30,12 @@ public class YoutubeLayoutTest {
         assertEquals(raw,YoutubeLayout.caption(shortsText,shorts(),922,2048,true));assertEquals("",PageTitles.clean(raw));
         assertEquals("",YoutubeLayout.caption(shortsText,Collections.emptyList(),922,2048,true));
     }
+    @Test public void statusAndNavigationInsetsDoNotHideTheShortsHeaderOrCaption(){
+        int top=100,height=1818;List<YoutubeLayout.Box> controls=new ArrayList<>();
+        for(YoutubeLayout.Box b:shorts())controls.add(b(b.left,b.top-top,b.right,b.bottom-top,b.role));
+        assertEquals(2,YoutubeLayout.share(controls,922,height,true));assertEquals(4,YoutubeLayout.more(controls,922,height,true));
+        List<YoutubeLayout.Caption> captions=Arrays.asList(new YoutubeLayout.Caption(b(40,1750-top,840,1800-top,0),"What If China Became a global Superpower?"),new YoutubeLayout.Caption(b(40,1840-top,840,1880-top,0),"Amour plastique · Videoclub"));
+        assertEquals("What If China Became a global Superpower?",YoutubeLayout.caption(captions,controls,922,height,true));
+        assertEquals("",YoutubeLayout.caption(Arrays.asList(captions.get(1)),controls,922,height,true));
+    }
 }

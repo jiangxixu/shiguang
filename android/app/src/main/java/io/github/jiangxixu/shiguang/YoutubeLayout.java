@@ -47,7 +47,7 @@ final class YoutubeLayout {
         for(int i=0;i<boxes.size();i++){
             Box b=boxes.get(i);if(!compact(b,w,h)||(b.role!=OTHER&&b.role!=MORE))continue;
             if(b.x()/w<.90||b.x()/w>.99)continue;
-            if(shorts?b.y()/h>.04&&b.y()/h<.15:row(b,arrow,h))matches.add(i);
+            if(shorts?b.y()/h>=0&&b.y()/h<.15:row(b,arrow,h))matches.add(i);
         }
         return unique(boxes,matches);
     }
@@ -57,7 +57,8 @@ final class YoutubeLayout {
         for(Caption c:text){
             Box b=c.box;String s=c.value;double y=(double)b.top/h;
             if(s.length()<4||s.length()>500||b.left<0||b.left>w*.2||b.width()<w*.4||b.bottom>h||s.startsWith("@"))continue;
-            if(shorts?(y<.80||y>.89):(y<Math.max(.16,rowY-.15)||b.bottom/(double)h>rowY-.025))continue;
+            if(shorts?(y<.78||y>.93):(y<Math.max(.16,rowY-.15)||b.bottom/(double)h>rowY-.025))continue;
+            if(shorts&&s.matches(".*[·•].*"))continue; // the music/artist strip is not the video title
             if(s.matches("(?is)(?:Shorts|YouTube|使用此音效.*|.*(?:人赞过|次观看|小时前|天前|周前|双击|点按两次).*)")||FavoriteRules.favoriteButton(s)||FavoriteRules.savedButton(s)||FavoriteRules.share(s))continue;
             if(best==null||b.top<best.box.top)best=c;
         }
