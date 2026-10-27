@@ -19,6 +19,7 @@ public class CapturedLinkTest {
         CapturedLink header=CapturedLink.parse(yt,"https://youtu.be/AbC123_-xyZ",1000,1000,"Robotics lecture title");check(header!=null&&header.title.equals("Robotics lecture title"));
         check(PageTitles.titleId(yt,"com.google.android.youtube:id/video_title"));check(!PageTitles.titleId(yt,"evil.app:id/video_title"));
         check(PageTitles.clean("保存到播放列表").isEmpty());check(PageTitles.clean("截断的内容标题…").isEmpty());
+        check(PageTitles.clean("机器人").equals("机器人"));check(PageTitles.clean("算法").equals("算法"));
         System.out.println("Focused capture rejects old clipboard, wrong platforms, homepages and ambiguous URLs; titles survive.");
     }
 }

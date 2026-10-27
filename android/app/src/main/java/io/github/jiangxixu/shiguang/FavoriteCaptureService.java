@@ -400,7 +400,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         return best;
     }
     private AccessibilityNodeInfo zhihuToolbar(Collection<AccessibilityNodeInfo> candidates,AccessibilityNodeInfo page){
-        if(!"com.zhihu.android".equals(pendingPackage)||page==null||pendingTitle.isEmpty())return null;
+        if(!"com.zhihu.android".equals(pendingPackage)||page==null)return null;
         android.graphics.Rect screen=new android.graphics.Rect();page.getBoundsInScreen(screen);if(screen.isEmpty())return null;
         AccessibilityNodeInfo best=null;int score=-1;boolean tie=false;
         for(AccessibilityNodeInfo node:candidates){
@@ -442,7 +442,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             values.add(text(node.getText()).trim().replaceAll("\\s+"," "));
             values.add(text(node.getContentDescription()).trim().replaceAll("\\s+"," "));
         }
-        return scene.contains(page.getWindowId(),values);
+        return scene.contains(page.getWindowId(),values,sourceTitle(page));
     }
     private void confirmSaved(){
         if(phase!=1||!enabled(this))return;
@@ -495,8 +495,11 @@ public class FavoriteCaptureService extends AccessibilityService {
                 android.graphics.Rect bounds=new android.graphics.Rect();target.getBoundsInScreen(bounds);matches.put(bounds.toString(),target);
             }
         }
-        // Ambiguous controls are deliberately not clicked.
-        return matches.size()==1?matches.values().iterator().next():(!copy?zhihuToolbar(matches.values(),root):null);
+        List<AccessibilityNodeInfo> targets=new ArrayList<>(matches.values());List<CaptureTargets.Box> boxes=new ArrayList<>();
+        for(AccessibilityNodeInfo target:targets){android.graphics.Rect b=new android.graphics.Rect();target.getBoundsInScreen(b);boxes.add(new CaptureTargets.Box(b.left,b.top,b.right,b.bottom));}
+        int unique=CaptureTargets.unique(boxes);
+        // Nested wrappers can name the same action; distinct controls still require a unique match.
+        return unique>=0?targets.get(unique):(!copy?zhihuToolbar(matches.values(),root):null);
     }
     private boolean clickNode(AccessibilityNodeInfo node){
         if(node==null||!node.isVisibleToUser()||!node.isEnabled()||node.isEditable()||node.isPassword())return false;

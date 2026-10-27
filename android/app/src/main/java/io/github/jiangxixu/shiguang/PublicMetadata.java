@@ -5,6 +5,16 @@ import java.util.regex.*;
 
 /** Bounded HTML metadata parsing; embedded state is data, never executable script. */
 final class PublicMetadata {
+    static String readPrefix(java.io.InputStream in,int limit,java.util.function.BooleanSupplier expired) throws java.io.IOException {
+        java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buffer=new byte[8192];
+        while(out.size()<limit&&!expired.getAsBoolean()){
+            int n;
+            try{n=in.read(buffer,0,Math.min(buffer.length,limit-out.size()));}
+            catch(java.net.SocketTimeoutException timeout){if(out.size()==0)throw timeout;break;}
+            if(n<0)break;out.write(buffer,0,n);
+        }
+        return new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8);
+    }
     static String decode(String value){
         Matcher m=Pattern.compile("&#(x[0-9a-fA-F]+|[0-9]+);").matcher(value);StringBuffer out=new StringBuffer();
         while(m.find()){String replacement=m.group();try{String n=m.group(1);int code=Integer.parseInt(n.startsWith("x")?n.substring(1):n,n.startsWith("x")?16:10);if(Character.isValidCodePoint(code)&&!(code>=0xd800&&code<=0xdfff))replacement=new String(Character.toChars(code));}catch(Exception ignored){}m.appendReplacement(out,Matcher.quoteReplacement(replacement));}m.appendTail(out);
@@ -20,12 +30,13 @@ final class PublicMetadata {
             String name=attrs.containsKey("property")?attrs.get("property"):attrs.get("name");
             if(name!=null&&attrs.containsKey("content"))values.put(name.toLowerCase(Locale.ROOT),attrs.get("content"));
         }
-        String title=values.get("og:title");if(title==null)title=values.get("twitter:title");
-        if(title==null){Matcher t=Pattern.compile("<title[^>]*>([^<]{0,1000})</title>",Pattern.CASE_INSENSITIVE).matcher(html);if(t.find())title=decode(t.group(1));}
+        String title=first(values,"og:title","twitter:title");
+        if(title.isEmpty()){Matcher t=Pattern.compile("<title[^>]*>([^<]{0,1000})</title>",Pattern.CASE_INSENSITIVE).matcher(html);if(t.find())title=decode(t.group(1));}
         values.put("title",title==null?"":title.trim());
-        String image=values.get("og:image:secure_url");if(image==null)image=values.get("og:image");if(image==null)image=values.get("twitter:image");
+        String image=first(values,"og:image:secure_url","og:image","twitter:image","twitter:image:src");
         values.put("thumbnail",image==null?"":image.trim());return values;
     }
+    private static String first(Map<String,String> values,String... keys){for(String key:keys){String value=values.get(key);if(value!=null&&!value.trim().isEmpty())return value;}return "";}
     static String renderData(String html){
         if(html==null||html.length()>2000000)return null;
         Matcher scripts=Pattern.compile("<script\\b([^>]{0,8192})>([\\s\\S]*?)</script\\s*>",Pattern.CASE_INSENSITIVE).matcher(html);

@@ -50,6 +50,13 @@ final class PreviewBridge {
         }catch(Exception ignored){}
         return new JSONObject();
     }
+    private static void addImage(JSONObject result,String base,String image){
+        if(image==null||image.trim().isEmpty())return;
+        try{
+            URL u=new URL(new URL(base),image.trim().replaceFirst("^//","https://").replaceFirst("(?i)^http:","https:"));
+            if("https".equals(u.getProtocol())&&u.getUserInfo()==null&&(u.getPort()==-1||u.getPort()==443))result.put("thumbnail",u.toString());
+        }catch(Exception ignored){} // A broken cover URL must not discard a valid title.
+    }
     private static JSONObject content(String value) throws Exception {
         String family=ContentPreviewUrls.family(value),current=value;
         if(family.equals("youtube"))current="https://www.youtube.com/oembed?url="+java.net.URLEncoder.encode(value,"UTF-8")+"&format=json";
@@ -65,15 +72,11 @@ final class PreviewBridge {
                 if(status>=300&&status<400){String location=c.getHeaderField("Location");if(location==null)return new JSONObject();current=new URL(new URL(current),location).toString();continue;}
                 if(status!=200)return new JSONObject();
                 String body;
-                try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
+                try(InputStream in=c.getInputStream()){
                     // WeChat includes large script bundles after its metadata. Read a
                     // bounded head prefix so a long article does not lose title/cover.
                     int limit=family.equals("wechat")?512000:2000000;
-                    byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){
-                        if(android.os.SystemClock.elapsedRealtime()>=deadline)return new JSONObject();
-                        if(out.size()+n>limit){if(!family.equals("wechat"))return new JSONObject();out.write(buffer,0,limit-out.size());break;}
-                        out.write(buffer,0,n);
-                    }body=new String(out.toByteArray(),StandardCharsets.UTF_8);
+                    body=PublicMetadata.readPrefix(in,limit,()->android.os.SystemClock.elapsedRealtime()>=deadline);
                 }
                 String title,image;
                 if(family.equals("youtube")){JSONObject data=new JSONObject(body);title=data.optString("title","");image=data.optString("thumbnail_url","");}
@@ -87,7 +90,7 @@ final class PreviewBridge {
                 }
                 title=ContentPreviewUrls.title(title);if(title.isEmpty()&&!matched)return new JSONObject();
                 JSONObject result=new JSONObject();if(!title.isEmpty())result.put("title",title);
-                if(image!=null&&!image.isEmpty()){image=new URL(new URL(current),image).toString().replaceFirst("(?i)^http:","https:");URL u=new URL(image);if("https".equals(u.getProtocol())&&u.getUserInfo()==null&&(u.getPort()==-1||u.getPort()==443))result.put("thumbnail",image);}
+                addImage(result,current,image);
                 return result;
             }finally{c.disconnect();}
         }
@@ -110,10 +113,8 @@ final class PreviewBridge {
                 if(status>=300&&status<400){String next=c.getHeaderField("Location");if(next==null)return new JSONObject();current=new URL(new URL(current),next).toString().replaceFirst("(?i)^http:","https:");continue;}
                 if(status!=200||XhsLinks.noteId(current)==null)return new JSONObject();
                 String html;
-                try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
-                    byte[] buffer=new byte[8192];int n;
-                    while((n=in.read(buffer))!=-1){if(out.size()+n>3000000||android.os.SystemClock.elapsedRealtime()>=deadline)return new JSONObject();out.write(buffer,0,n);}
-                    html=new String(out.toByteArray(),StandardCharsets.UTF_8);
+                try(InputStream in=c.getInputStream()){
+                    html=PublicMetadata.readPrefix(in,3000000,()->android.os.SystemClock.elapsedRealtime()>=deadline);
                 }
                 java.util.Map<String,String> meta=PublicMetadata.parse(html);String title=meta.get("title"),image=meta.get("thumbnail");boolean matchedNote=false;
                 JSONObject exact=XhsNoteMetadata.parse(html,XhsLinks.noteId(current));
@@ -121,14 +122,12 @@ final class PreviewBridge {
                 if(!exact.optString("title").isEmpty())title=exact.optString("title");
                 if(!exact.optString("thumbnail").isEmpty())image=exact.optString("thumbnail");
                 // Login/error pages must not replace a saved note title or masquerade as its cover.
-                if(title==null||title.trim().isEmpty())return new JSONObject();
+                if((title==null||title.trim().isEmpty())&&!matchedNote)return new JSONObject();
+                if(title==null)title="";
                 if(!matchedNote&&title.matches("(?i)(?:小红书登录|登录小红书|安全验证|访问频繁|页面不存在|内容不存在|Sign.?in).*"))return new JSONObject().put("requiresLogin",true);
                 if(title.matches("(?:小红书|小红书\\s*[-–—]\\s*你的生活指南|小红书\\s*[-–—]\\s*你的生活兴趣社区)"))return new JSONObject().put("requiresLogin",true);
                 JSONObject result=new JSONObject().put("title",title.substring(0,Math.min(title.length(),500)));
-                if(image!=null&&!image.isEmpty()){
-                    image=image.replaceFirst("^//","https://").replaceFirst("(?i)^http:","https:");
-                    URL u=new URL(image);if("https".equals(u.getProtocol())&&u.getUserInfo()==null&&(u.getPort()==-1||u.getPort()==443))result.put("thumbnail",image);
-                }
+                addImage(result,current,image);
                 return result;
             }finally{c.disconnect();}
         }
