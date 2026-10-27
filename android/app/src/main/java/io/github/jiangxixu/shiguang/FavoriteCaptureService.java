@@ -235,7 +235,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         if(boundFavorite==null||!control(n).equals(boundFavorite))return false;
         // A menu layout can move a remembered path onto Share or More. Explicit
         // action labels take precedence over a stale positional calibration.
-        for(AccessibilityNodeInfo child:nodes(n))if(FavoriteRules.otherAction(text(child.getText()))||FavoriteRules.otherAction(text(child.getContentDescription())))return false;
+        for(AccessibilityNodeInfo child:nodes(control(n)))if(FavoriteRules.otherAction(text(child.getText()))||FavoriteRules.otherAction(text(child.getContentDescription())))return false;
         return true;
     }
     private AccessibilityNodeInfo favoriteSource(AccessibilityNodeInfo source){
