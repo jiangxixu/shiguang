@@ -12,6 +12,8 @@ public class FavoriteRulesTest {
         check(!FavoriteRules.youtubeSavedEntry("com.google.android.youtube","android.widget.CheckBox","已保存"));
         check(!FavoriteRules.youtubeSavedEntry("com.google.android.youtube","android.widget.Button","Remove from Watch later"));
         check(!FavoriteRules.youtubeSavedEntry("com.xingin.xhs","android.widget.Button","已收藏"));
+        check(FavoriteRules.otherAction("分享，按钮"));check(FavoriteRules.otherAction("More options, button"));
+        check(!FavoriteRules.otherAction("保存到播放列表"));check(!FavoriteRules.otherAction("已保存"));
         check(FavoriteRules.favoriteButton("收藏"));check(FavoriteRules.favoriteButton("收藏 123"));
         check(FavoriteRules.favoriteButton("收藏,按钮,未选中"));check(FavoriteRules.favoriteButton("收藏 1.2万，按钮"));
         check(FavoriteRules.savedButton("取消收藏，按钮"));check(FavoriteRules.savedButton("已收藏 123"));

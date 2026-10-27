@@ -229,7 +229,15 @@ public class FavoriteCaptureService extends AccessibilityService {
         return n.isSelected()||n.isChecked()||target.isSelected()||target.isChecked()||FavoriteRules.savedState(text(n.getContentDescription()))||FavoriteRules.savedState(text(n.getText()))
             ||(Build.VERSION.SDK_INT>=30&&(FavoriteRules.savedState(text(n.getStateDescription()))||FavoriteRules.savedState(text(target.getStateDescription()))));
     }
-    private boolean favoriteNode(AccessibilityNodeInfo n){return n!=null&&((boundFavorite!=null&&control(n).equals(boundFavorite))||FavoriteRules.roleId(text(n.getPackageName()),n.getViewIdResourceName(),"favorite")||FavoriteRules.favoriteButton(text(n.getText()))||FavoriteRules.favoriteButton(text(n.getContentDescription()))||FavoriteRules.savedButton(text(n.getText()))||FavoriteRules.savedButton(text(n.getContentDescription())));}
+    private boolean favoriteNode(AccessibilityNodeInfo n){
+        if(n==null)return false;
+        if(FavoriteRules.roleId(text(n.getPackageName()),n.getViewIdResourceName(),"favorite")||FavoriteRules.favoriteButton(text(n.getText()))||FavoriteRules.favoriteButton(text(n.getContentDescription()))||FavoriteRules.savedButton(text(n.getText()))||FavoriteRules.savedButton(text(n.getContentDescription())))return true;
+        if(boundFavorite==null||!control(n).equals(boundFavorite))return false;
+        // A menu layout can move a remembered path onto Share or More. Explicit
+        // action labels take precedence over a stale positional calibration.
+        for(AccessibilityNodeInfo child:nodes(n))if(FavoriteRules.otherAction(text(child.getText()))||FavoriteRules.otherAction(text(child.getContentDescription())))return false;
+        return true;
+    }
     private AccessibilityNodeInfo favoriteSource(AccessibilityNodeInfo source){
         if(source==null||favoriteNode(source))return source;
         AccessibilityNodeInfo parent=source;

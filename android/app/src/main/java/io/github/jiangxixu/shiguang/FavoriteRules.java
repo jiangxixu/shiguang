@@ -31,6 +31,7 @@ final class FavoriteRules {
     static boolean copyForPlatform(String pkg,String label){return copy(label)||(platform(pkg)==3&&control(label).equals("分享链接"));}
     static boolean systemCopy(String label){String s=control(label);return copy(label)||s.equals("复制")||s.equalsIgnoreCase("Copy");}
     static boolean share(String label){String s=control(label);return s.equals("分享")||s.equals("分享按钮")||s.equals("分享笔记")||s.equals("分享视频")||s.equals("分享回答")||s.equals("分享文章")||s.equals("共享")||s.equalsIgnoreCase("Share")||s.equalsIgnoreCase("Sharevideo");}
+    static boolean otherAction(String label){return share(label)||copy(label)||control(label).matches("(?i)更多|更多信息|更多功能|更多选项|更多操作|More|Moreoptions|Moreactions|发送给朋友|分享到朋友圈|举报|Report");}
     static boolean roleId(String pkg,String id,String role){
         if(!supported(pkg)||id==null||!id.startsWith(pkg+":id/"))return false;
         // XHS's author-row arrow is named as a More operation, but opens its share menu.
