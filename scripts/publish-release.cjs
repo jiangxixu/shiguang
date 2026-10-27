@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="拾光 Android 1.6.30 · 抖音精选底部分享入口\n\n按用户提供的竖屏详情页适配：底部右侧分享圆按钮位于全屏按钮左侧。已有语义/适配规则未能确定唯一分享按钮时，检查当前页面的实际可点击控件及相邻按钮布局，只在抖音精选、原内容核对通过且右侧收藏栏存在时启用。不会直接按固定像素坐标点击；布局不符或多个候选时停止。复制后仍校验本次新链接。\n\n修复标题提取移除“展开”后，与原始页面文字比较不一致导致的原内容误判；仍保持同窗口和精确标题检查，不接受其他视频。保留后台补全与同步。\n\n新增截图布局比例、嵌套控件、全屏/稍后再看排除、歧义拒绝及标题一致性测试。构建通过后发布，尚未在用户 iQOO 真机验证。覆盖安装保留数据。";
+ const notes="拾光 Android 1.6.31 · 知乎取链接改进\n\n已明确识别为分享/更多的知乎入口不再依赖标题提取成功；仍先核对原内容窗口。复制链接或分享按钮存在嵌套父子控件时，合并为同一个目标，不再把同一按钮误判成多个候选；不同目标仍拒绝猜测。\n\n按用户提供的截图补充作者行右侧、关注按钮旁的分享控件布局识别，并排除顶部搜索和底部更多菜单。核对原内容时跳过动态赞同人数文字。补充知乎“分享问题/回答/文章”、“复制回答/文章/问题链接”及更多菜单动作名称，普通分享仍不触发收藏。仅在用户收藏并确认分类之后尝试取链接。\n\n保留抖音精选底部分享适配和后台保存。测试与构建通过后发布；尚未收到本次知乎失败的完整控件诊断，也未完成用户 iQOO 真机验证，因此不保证覆盖所有知乎版本。覆盖安装保留已有数据和按钮适配。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · Android App',body:notes,draft:false,prerelease:true})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();

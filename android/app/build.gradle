@@ -7,8 +7,8 @@ android {
         applicationId 'io.github.jiangxixu.shiguang'
         minSdk 26
         targetSdk 35
-        versionCode 190
-        versionName '1.6.30'
+        versionCode 191
+        versionName '1.6.31'
         buildConfigField 'String', 'WEB_URL', '"https://jiangxixu.github.io/shiguang/"'
     }
     buildFeatures { buildConfig true }
