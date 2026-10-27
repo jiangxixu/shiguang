@@ -1,6 +1,6 @@
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/favorite_accessibility_description"
-    android:packageNames="com.xingin.xhs,tv.danmaku.bili,com.bilibili.app.in,tv.danmaku.bilibilihd,com.zhihu.android,com.ss.android.ugc.aweme,com.ss.android.ugc.aweme.lite,com.ss.android.yumme.video,com.google.android.youtube,com.tencent.mm"
+    android:packageNames="com.xingin.xhs,tv.danmaku.bili,com.bilibili.app.in,tv.danmaku.bilibilihd,com.zhihu.android,com.ss.android.ugc.aweme,com.ss.android.ugc.aweme.lite,com.google.android.youtube,com.tencent.mm"
     android:accessibilityEventTypes="typeViewClicked|typeViewLongClicked|typeViewSelected|typeViewScrolled|typeWindowStateChanged|typeWindowsChanged|typeWindowContentChanged|typeNotificationStateChanged|typeAnnouncement"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"

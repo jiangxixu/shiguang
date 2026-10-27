@@ -12,7 +12,7 @@ final class PlatformLinks {
         if(host(h,"xiaohongshu.com")||host(h,"xhslink.com")||host(h,"xhslink.cn"))return new String[]{"com.xingin.xhs"};
         if(host(h,"bilibili.com")||host(h,"b23.tv"))return new String[]{"tv.danmaku.bili","com.bilibili.app.in","tv.danmaku.bilibilihd"};
         if(host(h,"zhihu.com")||host(h,"zhihu.link"))return new String[]{"com.zhihu.android"};
-        if(host(h,"douyin.com")||host(h,"iesdouyin.com"))return new String[]{"com.ss.android.ugc.aweme","com.ss.android.ugc.aweme.lite","com.ss.android.yumme.video"};
+        if(host(h,"douyin.com")||host(h,"iesdouyin.com"))return new String[]{"com.ss.android.ugc.aweme","com.ss.android.ugc.aweme.lite"};
         if(host(h,"youtube.com")||host(h,"youtu.be"))return new String[]{"com.google.android.youtube"};
         if(h.equals("mp.weixin.qq.com"))return new String[]{"com.tencent.mm"};
         if(host(h,"github.com"))return new String[]{"com.github.android"};

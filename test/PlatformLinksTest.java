@@ -16,9 +16,6 @@ public class PlatformLinksTest {
         check(calls.size()==2);
         check(PlatformLinks.packages("WWW.ZHIHU.COM")[0].equals("com.zhihu.android"));
         check(PlatformLinks.packages("v.douyin.com")[0].equals("com.ss.android.ugc.aweme"));
-        calls.clear();
-        check(PlatformLinks.open("https://v.douyin.com/AbC123/",(url,pkg)->{calls.add(String.valueOf(pkg));return "com.ss.android.yumme.video".equals(pkg);}));
-        check(calls.equals(Arrays.asList("com.ss.android.ugc.aweme","com.ss.android.ugc.aweme.lite","com.ss.android.yumme.video")));
         check(PlatformLinks.packages("youtu.be")[0].equals("com.google.android.youtube"));
         check(PlatformLinks.packages("xhslink.cn")[0].equals("com.xingin.xhs"));
         String note="https://www.xiaohongshu.com/discovery/item/0123456789abcdef01234567?xsec_token=a%2Bb";

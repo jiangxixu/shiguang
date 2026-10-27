@@ -26,7 +26,7 @@ final class FavoriteBindings {
             return value.toString();
         }catch(Exception e){return null;}
     }
-    private static String key(String pkg,String role){return FavoriteRules.bindingProfile(pkg)+":"+role;}
+    private static String key(String pkg,String role){int index=FavoriteRules.platform(pkg);return (index>=0?FavoriteRules.PACKAGES[index]:pkg)+":"+role;}
     private static JSONArray rules(Context c,String pkg,String role){
         String raw=c.getSharedPreferences("favorite-bindings",Context.MODE_PRIVATE).getString(key(pkg,role),null);
         if(raw==null)raw=c.getSharedPreferences("favorite-bindings",Context.MODE_PRIVATE).getString(pkg+":"+role,null);

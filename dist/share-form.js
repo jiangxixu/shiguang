@@ -9,7 +9,6 @@
   if(draft){const source=document.getElementById('platform');if(source)source.textContent='来源：'+(SG.platforms[draft.platform]?.name||'其他网站');}
   function applyMetadata(meta){
    if(persisted){
-    if(window.ShiguangBackground)return;
     // Re-read the current library: never resurrect a deleted item or overwrite edits.
     if(localStorage.getItem('shiguang.cloud.owner')!==owner)return;
     const items=JSON.parse(localStorage.getItem(ShiguangCapture.KEY)||'[]');
@@ -46,11 +45,6 @@
     if(localStorage.getItem('shiguang.cloud.owner')!==owner)throw Error('账号已切换，请重新分享');
     const result=ShiguangCapture.save(localStorage,[{...draft,tags:message.tags,notes:message.reason||''}]);
     persisted=true;
-    if(window.ShiguangBackground){
-     await ShiguangBackgroundCapture.enqueue(draft,owner);
-     report({saved:true,background:true,duplicate:result.duplicates>0});
-     return {ok:true,duplicate:result.duplicates>0};
-    }
     report({saved:true});
     // Keep the editor alive while metadata and synchronization finish.
     // The durable library itself is the retry source on the next app launch.

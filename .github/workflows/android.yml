@@ -39,8 +39,6 @@ jobs:
           java -cp "$RUNNER_TEMP/favorite-test" io.github.jiangxixu.shiguang.FavoriteTransitionsTest
           javac -d "$RUNNER_TEMP/favorite-test" android/app/src/main/java/io/github/jiangxixu/shiguang/FavoriteScene.java test/FavoriteSceneTest.java
           java -cp "$RUNNER_TEMP/favorite-test" io.github.jiangxixu.shiguang.FavoriteSceneTest
-          javac -d "$RUNNER_TEMP/favorite-test" android/app/src/main/java/io/github/jiangxixu/shiguang/DouyinSelectedLayout.java test/DouyinSelectedLayoutTest.java
-          java -cp "$RUNNER_TEMP/favorite-test" io.github.jiangxixu.shiguang.DouyinSelectedLayoutTest
           javac -d "$RUNNER_TEMP/favorite-test" android/app/src/main/java/io/github/jiangxixu/shiguang/PublicMetadata.java test/PublicMetadataTest.java
           java -cp "$RUNNER_TEMP/favorite-test" io.github.jiangxixu.shiguang.PublicMetadataTest
           javac -d "$RUNNER_TEMP/favorite-test" android/app/src/main/java/io/github/jiangxixu/shiguang/CaptureClickBounds.java test/CaptureClickBoundsTest.java android/app/src/main/java/io/github/jiangxixu/shiguang/ContentPreviewUrls.java test/ContentPreviewUrlsTest.java
