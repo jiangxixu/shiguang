@@ -3,7 +3,9 @@
  const config=root.ShiguangCloudConfig,KEY='shiguang.library.v1',OWNER='shiguang.cloud.owner';
  const client=ShiguangSupabase.createClient(config.url,config.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true},global:{fetch:(url,options={})=>fetch(url,{...options,signal:options.signal||AbortSignal.timeout(12000)})}});
  const model=root.ShiguangSyncModel;
- let user=null,active=null,debounce;
+ let user=null,active=null,debounce,mailPending=false;
+ const MAIL_WAIT='shiguang.auth.mail-next';
+ const mailRemaining=()=>Math.max(0,Math.ceil(((Number(localStorage.getItem(MAIL_WAIT))||0)-Date.now())/1000));
  const readItems=()=>{const raw=JSON.parse(localStorage.getItem(KEY)||'[]');if(!Array.isArray(raw))throw Error('本机知识库格式异常，请先备份');return raw;};
  const stateKey=uid=>'shiguang.cloud.state.'+uid;
  const getState=uid=>JSON.parse(localStorage.getItem(stateKey(uid))||'{"last":{},"pending":{}}');
@@ -58,7 +60,14 @@
  }
  function schedule(){if(root.ShiguangBackgroundRunner)return;clearTimeout(debounce);debounce=setTimeout(()=>sync().catch(()=>{}),700);}
  const api={client,user,message:'登录后自动同步',sync,schedule,
-  async requestCode(email){const {error}=await client.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:'https://jiangxixu.github.io/shiguang/'}});if(error)throw error;},
+  mailRemaining,
+  async requestCode(email){
+   if(mailPending)throw Error('登录邮件正在发送，请勿重复点击');
+   if(mailRemaining()>0)throw Error('请稍后再发送；如果已收到邮件，请使用最近一封登录');
+   // Keep this across dialog closes/restarts, including an ambiguous network timeout.
+   localStorage.setItem(MAIL_WAIT,String(Date.now()+60000));mailPending=true;
+   try{const {error}=await client.auth.signInWithOtp({email:email.trim(),options:{shouldCreateUser:true,emailRedirectTo:'https://jiangxixu.github.io/shiguang/'}});if(error)throw error;}finally{mailPending=false;}
+  },
   async verifyCode(email,token){const {data,error}=await client.auth.verifyOtp(ShiguangAuthInput.parse(token,config.url,email));if(error)throw error;bind(data.user);await sync();},
   async signOut(){
    // Flush before switching identities; on failure keep the session and all pending work.
