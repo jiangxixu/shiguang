@@ -17,10 +17,13 @@ final class FavoriteRules {
     static String platformName(String pkg){int p=platform(pkg);return p<0?"原 App":PLATFORMS[p];}
     static boolean shareSheet(String pkg){return "android".equals(pkg)||"com.android.intentresolver".equals(pkg)||"com.google.android.intentresolver".equals(pkg);}
     static String clean(String s){return s==null?"":s.replaceAll("\\s+","").trim();}
-    private static String control(String label){return clean(label).replaceAll("[,，](?:按钮|未选中|已选中|双击激活|点按两次即可激活|(?i:button|notselected|selected|doubletaptoactivate))","");}
-    static boolean favoriteButton(String label){String s=control(label);return s.matches("(?i)(?:收藏|收藏按钮|收藏此笔记|添加收藏|加入收藏|保存|保存到播放列表|保存至播放列表|存入播放列表|加入播放列表|保存到稍后观看|保存视频|收藏视频|稍后观看|加入稍后观看|儲存|儲存至播放清單|稍後觀看|Favorite|Save|Savetoplaylist|Savevideotoplaylist|Savetowatchlater|AddtoWatchlater)(?:[,，:：]?\\d+(?:\\.\\d+)?[万千wWkK]?)?");}
+    private static String control(String label){return clean(label).replaceAll("[,，。](?:按钮|未选中|已选中|双击激活|点按两次即可激活|(?i:button|notselected|selected|doubletaptoactivate))","").replaceFirst("(?i)^(?:未选中|已选中|notselected|selected)[,，:：]+","").replaceAll("[。.!！]+$","");}
+    static boolean favoriteButton(String label){String s=control(label);return s.matches("(?i)(?:收藏|收藏按钮|收藏此笔记|收藏文章|收藏此文章|添加收藏|加入收藏|加入收藏夹|保存|(?:将(?:此)?视频)?保存[到至]播放列表|存入播放列表|加入播放列表|保存[到至]稍后观看|保存视频|收藏视频|稍后观看|(?:加入|添加到)稍后观看|儲存|儲存[至到]播放清單|將影片儲存至播放清單|儲存影片|稍後觀看|Favorite|Save|Saveto(?:a)?playlist|Savevideoto(?:a)?playlist|Savetowatchlater|AddtoWatchlater)(?:[,，:：]?\\d+(?:\\.\\d+)?[万千wWkK]?)?");}
     static boolean savedButton(String label){String s=control(label);return s.matches("(?i)(?:取消收藏|已收藏|已保存|已儲存|已存入|Saved|RemovefromWatchlater)(?:[,，:：]?\\d+(?:\\.\\d+)?[万千wWkK]?)?");}
     static boolean savedState(String label){return savedButton(label)||clean(label).matches("(?:已选中|已勾选|选中)")||clean(label).matches(".*[,，](?:已选中|已勾选)(?:[,，].*)?");}
+    static boolean youtubeSavedEntry(String pkg,String kind,String label){
+        return "com.google.android.youtube".equals(pkg)&&kind!=null&&!kind.matches(".*(?:CheckBox|CheckedTextView|Switch)")&&control(label).matches("(?i)Saved|已保存|已儲存|已存入");
+    }
     static boolean success(String label){String s=clean(label);return s.matches("(?:收藏成功|已收藏|已收藏到微信|已添加到收藏夹|成功添加到收藏夹|保存成功|已添加至稍后观看)[!！。]?")||s.matches("(?i)(?:已保存到|已保存至|已儲存至|Savedto|Addedto).{1,100}");}
     static boolean copy(String label){String s=control(label);return s.equals("复制链接")||s.equals("复制链接按钮")||s.equals("复制笔记链接")||s.equals("拷贝链接")||s.equals("複製連結")||s.equalsIgnoreCase("Copylink");}
     // Douyin labels its copy-to-clipboard action 分享链接 on some releases.
@@ -30,6 +33,8 @@ final class FavoriteRules {
     static boolean share(String label){String s=control(label);return s.equals("分享")||s.equals("分享按钮")||s.equals("分享笔记")||s.equals("分享视频")||s.equals("分享回答")||s.equals("分享文章")||s.equals("共享")||s.equalsIgnoreCase("Share")||s.equalsIgnoreCase("Sharevideo");}
     static boolean roleId(String pkg,String id,String role){
         if(!supported(pkg)||id==null||!id.startsWith(pkg+":id/"))return false;
+        // XHS's author-row arrow is named as a More operation, but opens its share menu.
+        if(pkg.equals("com.xingin.xhs")&&role.equals("share")&&id.equals("com.xingin.xhs:id/moreOperateIV"))return true;
         String tail=id.substring((pkg+":id/").length());
         String name=role.equals("favorite")?"(?:favorite|favourite|favor|fav|collect|collection|save|save_to_playlist|watch_later)":role.equals("share")?"(?:share|sharing|forward)":"(?:copy_link|copylink|link_copy)";
         return tail.matches("(?i)(?:(?:btn|button|iv|tv|img|image|icon|frame|action|layout|ll|rl)_)*"+name+"(?:_(?:btn|button|icon|view|layout|container))?");

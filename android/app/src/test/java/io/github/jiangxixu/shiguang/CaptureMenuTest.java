@@ -4,6 +4,31 @@ import static org.junit.Assert.*;
 import java.util.*;
 
 public class CaptureMenuTest {
+    @Test public void fullWidthSaveRowsCanBeRememberedWithoutAcceptingSheets(){
+        assertTrue(MenuActions.bindingShape(1080,144,1080,2400));
+        assertTrue(MenuActions.bindingShape(180,180,1080,2400));
+        assertFalse(MenuActions.bindingShape(1080,1200,1080,2400));
+        assertFalse(MenuActions.bindingShape(1080,400,1080,2400));
+        assertFalse(MenuActions.bindingShape(1200,100,1080,2400));
+        assertFalse(MenuActions.bindingShape(100,100,0,0));
+    }
+    @Test public void nativeMenuCanKeepRecentlyVerifiedArticleAcrossWindowChange(){
+        MenuOrigin state=new MenuOrigin();state.observe("com.tencent.mm",7,"文章标题","文章标题",1000);
+        state.openMenu("com.tencent.mm",1500);
+        state.observe("com.tencent.mm",9,"","收藏",1600);
+        assertEquals(7,state.source("com.tencent.mm",2000).window);
+        assertEquals("文章标题",state.source("com.tencent.mm",2000).title);
+        assertNull(state.source("com.google.android.youtube",2000));
+        state.clear();state.observe("com.tencent.mm",7,"旧文章","旧文章",1000);state.openMenu("com.tencent.mm",4000);
+        assertNull(state.source("com.tencent.mm",4000));
+    }
+    @Test public void webArticleEvidenceNeedsHeadingAndFooterOrTwoDistinctFooterMarkers(){
+        assertTrue(MenuActions.articleContext(Arrays.asList("阅读原文","在看"),false));
+        assertTrue(MenuActions.articleContext(Arrays.asList("写留言"),true));
+        assertFalse(MenuActions.articleContext(Arrays.asList("在看","在看"),false));
+        assertFalse(MenuActions.articleContext(Arrays.asList("收藏","发送给朋友"),true));
+        assertFalse(MenuActions.articleContext(Arrays.asList("聊天里提到阅读原文和在看"),true));
+    }
     @Test public void fullWidthMenuRowsAreActionsButSheetsAndVideoCardsAreNot(){
         assertTrue(MenuActions.compact(1080,144,1080,3));
         assertFalse(MenuActions.compact(1080,1800,1080,3));

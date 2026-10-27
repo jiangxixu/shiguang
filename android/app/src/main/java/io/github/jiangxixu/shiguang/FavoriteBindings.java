@@ -11,7 +11,7 @@ final class FavoriteBindings {
     static String capture(AccessibilityNodeInfo root,AccessibilityNodeInfo target){
         try{
             Rect screen=new Rect(),box=new Rect();root.getBoundsInScreen(screen);target.getBoundsInScreen(box);
-            if(screen.width()<=0||screen.height()<=0||box.isEmpty()||box.width()>screen.width()*0.6||box.height()>screen.height()*0.25||target.isEditable()||target.isPassword())return null;
+            if(!MenuActions.bindingShape(box.width(),box.height(),screen.width(),screen.height())||target.isEditable()||target.isPassword())return null;
             ArrayList<Integer> path=new ArrayList<>();AccessibilityNodeInfo child=target;
             while(!child.equals(root)&&path.size()<30){
                 AccessibilityNodeInfo parent=child.getParent();if(parent==null)return null;
@@ -60,7 +60,7 @@ final class FavoriteBindings {
             for(AccessibilityNodeInfo n:nodes){
                 if(!n.isVisibleToUser()||!n.isEnabled()||n.isEditable()||n.isPassword())continue;
                 Rect box=new Rect();n.getBoundsInScreen(box);
-                if(box.isEmpty()||box.width()>screen.width()*0.6||box.height()>screen.height()*0.25)continue;
+                if(!MenuActions.bindingShape(box.width(),box.height(),screen.width(),screen.height()))continue;
                 double x=(box.exactCenterX()-screen.left)/screen.width(),y=(box.exactCenterY()-screen.top)/screen.height();
                 int score=FavoriteBindingMatch.score(rule.optString("id"),n.getViewIdResourceName(),rule.optString("class").equals(String.valueOf(n.getClassName())),n.equals(pathTarget),Math.abs(x-rule.getDouble("x")),Math.abs(y-rule.getDouble("y")));
                 if(score>=0)scores.put(n,Math.max(scores.getOrDefault(n,-1),score));

@@ -2,6 +2,16 @@ package io.github.jiangxixu.shiguang;
 public class FavoriteRulesTest {
     static void check(boolean condition){if(!condition)throw new AssertionError();}
     public static void main(String[] args){
+        for(String label:new String[]{"将视频保存到播放列表","Save video to a playlist, button","未选中，保存到播放列表。","儲存到播放清單","收藏文章"})check(FavoriteRules.favoriteButton(label));
+        for(String label:new String[]{"分享视频","取消收藏","不保存到播放列表","保存到相册","下载视频"})check(!FavoriteRules.favoriteButton(label));
+        check(FavoriteRules.roleId("com.xingin.xhs","com.xingin.xhs:id/moreOperateIV","share"));
+        check(!FavoriteRules.roleId("com.xingin.xhs","com.xingin.xhs:id/moreOperateIV","favorite"));
+        check(!FavoriteRules.roleId("com.google.android.youtube","com.xingin.xhs:id/moreOperateIV","share"));
+        check(FavoriteRules.youtubeSavedEntry("com.google.android.youtube","android.widget.Button","Saved, button"));
+        check(FavoriteRules.youtubeSavedEntry("com.google.android.youtube","android.widget.RadioButton","已保存"));
+        check(!FavoriteRules.youtubeSavedEntry("com.google.android.youtube","android.widget.CheckBox","已保存"));
+        check(!FavoriteRules.youtubeSavedEntry("com.google.android.youtube","android.widget.Button","Remove from Watch later"));
+        check(!FavoriteRules.youtubeSavedEntry("com.xingin.xhs","android.widget.Button","已收藏"));
         check(FavoriteRules.favoriteButton("收藏"));check(FavoriteRules.favoriteButton("收藏 123"));
         check(FavoriteRules.favoriteButton("收藏,按钮,未选中"));check(FavoriteRules.favoriteButton("收藏 1.2万，按钮"));
         check(FavoriteRules.savedButton("取消收藏，按钮"));check(FavoriteRules.savedButton("已收藏 123"));

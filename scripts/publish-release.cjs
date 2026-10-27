@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="基于 1.6.27 的有限修复测试包，保留该版本的收藏触发和保存流程。修正同一分享/复制动作的父子控件重复匹配、经过清理的原内容标题无法核对、知乎菜单过度依赖标题、2至3字标题被丢弃的问题。元信息读取改为保留有上限的网页前缀，避免尾部脚本体积过大或读取超时导致标题封面全部丢失；空 OG 字段继续尝试 Twitter 和网页标题，封面地址异常不再丢弃有效标题。保留跨平台及新链接校验。没有恢复 1.6.28 的后台任务架构。自动化测试与构建通过后发布，尚未完成用户真机验证。请覆盖安装；1.6.27 恢复包继续作为默认下载版本。";
+ const notes="在 1.6.27 基础修复包上针对小红书、微信公众号和 YouTube 调整。小红书优先使用作者行右侧 moreOperateIV 分享箭头，避免旧分享适配遮蔽已知入口。支持 YouTube 完整保存菜单名称、辅助功能标注及已保存入口，排除播放列表复选框和明确移除动作。已适配的微信 WebView 可在 DOM 标记缺失时保留文章上下文；原生菜单不再被文章标记检查提前拦截。更多菜单与分类窗口分开处理，适配时不会把已识别的更多按钮记成收藏。允许记忆短的整行菜单按钮，仍拒绝整块面板。微信公众号保存前仍严格核对原链接为 mp.weixin.qq.com 文章。自动测试与签名构建通过后发布；没有连接到用户手机，尚待实际验证。请覆盖安装。1.6.27 恢复包仍为默认下载。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · 1.6.27 基础修复测试包',body:notes,draft:false,prerelease:true})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();
