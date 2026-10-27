@@ -29,6 +29,8 @@ public class FavoriteCaptureService extends AccessibilityService {
     private long lastObserved,lastDiagnostic,lastClick,lastClickDiagnostic;
     private String lastClickPackage="",lastDiagnosticText="";
     private boolean learningArmed,scrollMessageSent,zhihuMoreOpened,zhihuShareOpened;
+    private int youtubePanelBacks;
+    private String youtubeMoreKey="";
     private long copyTimeout=3000;
     private AccessibilityNodeInfo boundFavorite;
     private final Runnable sample=new Runnable(){public void run(){
@@ -76,7 +78,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     static boolean enabled(Context c){return c.getSharedPreferences("automatic",MODE_PRIVATE).getBoolean("enabled",false);}
     static void pause(Context c){c.getSharedPreferences("automatic",MODE_PRIVATE).edit().putBoolean("enabled",false).apply();if(instance!=null){instance.reset();instance.disableSelf();}}
     @Override protected void onServiceConnected(){instance=this;samplingInterrupted=false;eventCount=0;lastEventAt=0;lastEventPackage="";reset();state("服务已连接，等待已支持平台的收藏/保存操作");}
-    private void reset(){handler.removeCallbacksAndMessages(null);contentEvents.clear();if(captureOverlay!=null){captureOverlay.dismiss();captureOverlay=null;}if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingFavoriteSelector="";shareReadiness.reset();sampleReadiness.reset();pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();menuOrigin.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;boundFavorite=null;if(instance==this&&enabled(this))handler.postDelayed(sample,200);}
+    private void reset(){youtubePanelBacks=0;youtubeMoreKey="";handler.removeCallbacksAndMessages(null);contentEvents.clear();if(captureOverlay!=null){captureOverlay.dismiss();captureOverlay=null;}if(prompt!=null){prompt.dismiss();prompt=null;}phase=0;pendingFavoriteSelector="";shareReadiness.reset();sampleReadiness.reset();pendingPackage="";pendingShareRule="";pendingTitle="";zhihuMoreOpened=false;zhihuShareOpened=false;clickedKey="";transitions.clear();scene.clear();menuOrigin.clear();observedPackage="";learningArmed=false;scrollMessageSent=false;boundFavorite=null;if(instance==this&&enabled(this))handler.postDelayed(sample,200);}
     private String text(CharSequence value){return value==null?"":value.toString();}
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(event==null)return;
@@ -149,7 +151,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             // Sharing by itself is not a collection request. Disarm any prior
             // observation so opening a share sheet cannot start a capture.
             AccessibilityNodeInfo clickedControl=event.getSource();
-            if(phase==0){AccessibilityNodeInfo current=platformRoot(pkg);boundFavorite=FavoriteBindings.find(this,pkg,"favorite",current,nodes(current));}
+            if(phase==0){AccessibilityNodeInfo current=platformRoot(pkg);boundFavorite=findFavorite(pkg,current);}
             boolean videoMenu=phase==0&&(("com.google.android.youtube".equals(pkg)&&youtubeOverflow(clickedControl))||("com.tencent.mm".equals(pkg)&&wechatMoreControl(clickedControl)));
             if(phase==0&&!videoMenu&&!favoriteNode(favoriteSource(clickedControl))&&shareSource(clickedControl,pkg)){
                 transitions.clear();menuOrigin.clear();lastClick=0;lastClickPackage="";return;
@@ -157,6 +159,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             lastClick=now;lastClickPackage=pkg;
             // Opening More may precede Save; remember the video but do not capture it.
             if(videoMenu)menuOrigin.open(pkg,clickedControl.getWindowId(),now);
+            if(videoMenu&&"com.google.android.youtube".equals(pkg)){transitions.clear();return;}
         }
         boolean success=FavoriteRules.confirmedSuccess(text(event.getContentDescription()));
         for(CharSequence value:event.getText())success|=FavoriteRules.confirmedSuccess(text(value));
@@ -171,7 +174,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             int type=event.getEventType();
             AccessibilityNodeInfo current=platformRoot(pkg);
             if(current!=null){
-                boundFavorite=FavoriteBindings.find(this,pkg,"favorite",current,nodes(current));
+                boundFavorite=findFavorite(pkg,current);
                 // A state refresh during initial loading is not a user favorite. A generic
                 // click (even with no label), or an explicit success event, must precede it.
                 if(click){AccessibilityNodeInfo clicked=favoriteSource(event.getSource());transitions.interact(scope(pkg,current.getWindowId()),clicked==null?"":nodeKey(clicked),now);}
@@ -240,6 +243,24 @@ public class FavoriteCaptureService extends AccessibilityService {
     }
     private AccessibilityNodeInfo favoriteSource(AccessibilityNodeInfo source){
         if(source==null||favoriteNode(source))return source;
+        if("com.google.android.youtube".equals(text(source.getPackageName()))){
+            // A menu icon click may expose Save only in a sibling text node.
+            for(AccessibilityNodeInfo row=source;row!=null&&compact(row);row=row.getParent()){
+                AccessibilityNodeInfo save=null;boolean other=false;
+                android.graphics.Rect rowBox=new android.graphics.Rect();row.getBoundsInScreen(rowBox);Set<String> buttons=new HashSet<>();
+                for(AccessibilityNodeInfo child:nodes(row))if(child.isClickable()){
+                    android.graphics.Rect b=new android.graphics.Rect();child.getBoundsInScreen(b);
+                    if(b.width()<rowBox.width()*.6&&b.width()>0&&b.height()>0)buttons.add(b.toString());
+                }
+                // The whole player toolbar has many actions; it is not a Save row.
+                if(rowBox.width()>getResources().getDisplayMetrics().widthPixels*.6&&buttons.size()>=3)continue;
+                for(AccessibilityNodeInfo child:nodes(row))for(String label:new String[]{text(child.getText()),text(child.getContentDescription())}){
+                    if(FavoriteRules.favoriteButton(label)||FavoriteRules.youtubeSavedEntry("com.google.android.youtube",text(child.getClassName()),label))save=child;
+                    if(FavoriteRules.otherAction(label)||label.trim().matches("(?i)点赞|不喜欢|喜欢|订阅|感谢|下载|Like|Dislike|Subscribe|Thanks|Download"))other=true;
+                }
+                if(save!=null&&!other)return save;
+            }
+        }
         AccessibilityNodeInfo parent=source;
         for(int i=0;i<6;i++){parent=parent.getParent();if(parent==null||!compact(parent))break;if(favoriteNode(parent))return parent;}
         // Compact action chips can nest their text below several layout wrappers.
@@ -265,12 +286,14 @@ public class FavoriteCaptureService extends AccessibilityService {
         long now=SystemClock.elapsedRealtime();if(phase!=0||now-lastAttempt<4000)return;
         if("com.tencent.mm".equals(pkg)&&!wechatAllowed(platformRoot(pkg)))return;
         MenuOrigin.Source origin=menuOrigin.source(pkg,now);
+        if(origin==null&&"com.google.android.youtube".equals(pkg)&&youtubeSavePanel(platformRoot(pkg)))origin=menuOrigin.recentVideo(pkg,now);
         AccessibilityNodeInfo before=platformRoot(pkg);String selector="";
         if(!key.isEmpty())for(AccessibilityNodeInfo n:nodes(before))if(nodeKey(n).equals(key)){
             String captured=FavoriteBindings.capture(before,control(n));if(captured!=null){selector=captured;break;}
         }
         reset();shareReadiness.reset();lastAttempt=now;pendingPackage=pkg;clickedKey=key;phase=1;wait.start(now);
         pendingFavoriteSelector=selector;
+        youtubePanelBacks=0;
         AccessibilityNodeInfo page=platformRoot(pkg);pendingTitle=origin==null?sourceTitle(page):origin.title;
         scene.start(origin==null?(page==null?-1:page.getWindowId()):origin.window,origin==null?sceneText(page):origin.anchor,now);
         // The user's favorite/save action is enough to open the editor. Saving
@@ -290,7 +313,11 @@ public class FavoriteCaptureService extends AccessibilityService {
         AccessibilityNodeInfo root=platformRoot(pkg);if(root==null)return;
         if("com.tencent.mm".equals(pkg)&&!wechatAllowed(root))return;
         if(("com.google.android.youtube".equals(pkg)&&!actionMenu(root,pkg))||("com.tencent.mm".equals(pkg)&&!wechatContentNodes(root).isEmpty()))menuOrigin.observe(pkg,root.getWindowId(),sourceTitle(root),sceneText(root),SystemClock.elapsedRealtime());
-        boundFavorite=FavoriteBindings.find(this,pkg,"favorite",root,nodes(root));
+        boundFavorite=findFavorite(pkg,root);
+        if("com.google.android.youtube".equals(pkg)&&!youtubeSavePanel(root)){
+            YoutubePage player=youtubePage(root);int more=YoutubeLayout.more(player.boxes,player.width,player.height,player.shorts);
+            youtubeMoreKey=more<0?"":nodeKey(player.controls.get(more));
+        }
         Map<String,Boolean> states=new HashMap<>();
         for(AccessibilityNodeInfo n:nodes(root))if(favoriteNode(n)){String key=nodeKey(n);states.put(key,Boolean.TRUE.equals(states.get(key))||selected(n));}
         long now=SystemClock.elapsedRealtime();
@@ -313,7 +340,7 @@ public class FavoriteCaptureService extends AccessibilityService {
     private AccessibilityNodeInfo root(){
         AccessibilityNodeInfo node=platformRoot(pendingPackage);
         if(phase==2){AccessibilityNodeInfo active=getRootInActiveWindow();if(active!=null&&FavoriteRules.shareSheet(text(active.getPackageName())))node=active;}
-        boundFavorite=FavoriteBindings.find(this,pendingPackage,"favorite",node,nodes(node));return node;
+        boundFavorite=findFavorite(pendingPackage,node);return node;
     }
     private List<AccessibilityNodeInfo> nodes(AccessibilityNodeInfo root){
         return VisibleNodes.collect(root,new VisibleNodes.Tree<AccessibilityNodeInfo>(){
@@ -322,6 +349,70 @@ public class FavoriteCaptureService extends AccessibilityService {
             public int children(AccessibilityNodeInfo n){return n.getChildCount();}
             public AccessibilityNodeInfo child(AccessibilityNodeInfo n,int index){return n.getChild(index);}
         });
+    }
+    private AccessibilityNodeInfo findFavorite(String pkg,AccessibilityNodeInfo page){
+        AccessibilityNodeInfo learned=FavoriteBindings.find(this,pkg,"favorite",page,nodes(page));
+        return learned==null&&"com.ss.android.yumme.video".equals(pkg)?selectedControl(page,false):learned;
+    }
+    private AccessibilityNodeInfo selectedControl(AccessibilityNodeInfo page,boolean share){
+        if(page==null||!"com.ss.android.yumme.video".equals(text(page.getPackageName()))||(share&&(phase!=1||!sameScene(page))))return null;
+        android.graphics.Rect screen=new android.graphics.Rect();page.getBoundsInScreen(screen);if(screen.isEmpty())return null;
+        List<AccessibilityNodeInfo> candidates=new ArrayList<>();List<DouyinSelectedLayout.Box> boxes=new ArrayList<>();boolean later=false;
+        for(AccessibilityNodeInfo n:nodes(page)){
+            String label=text(n.getText())+" "+text(n.getContentDescription());
+            if(label.contains("稍后再看")||label.contains("稍后观看"))later=true;
+            if(!n.isClickable()||!n.isEnabled()||n.isEditable()||n.isPassword())continue;
+            android.graphics.Rect b=new android.graphics.Rect();n.getBoundsInScreen(b);
+            boolean excluded=label.matches("(?is).*(?:全屏|稍后|推荐|搜索|点赞|评论|fullscreen|watch.?later|search|like|comment).*" )||(share&&label.contains("收藏"));
+            candidates.add(n);boxes.add(new DouyinSelectedLayout.Box(b.left-screen.left,b.top-screen.top,b.right-screen.left,b.bottom-screen.top,excluded));
+        }
+        int index=share?DouyinSelectedLayout.select(boxes,screen.width(),screen.height()):DouyinSelectedLayout.favorite(boxes,screen.width(),screen.height(),later);
+        return index<0?null:candidates.get(index);
+    }
+    private static final class YoutubePage {
+        final List<AccessibilityNodeInfo> controls=new ArrayList<>();final List<YoutubeLayout.Box> boxes=new ArrayList<>();
+        final List<YoutubeLayout.Caption> captions=new ArrayList<>();int width,height;boolean shorts;
+    }
+    private YoutubePage youtubePage(AccessibilityNodeInfo page){
+        YoutubePage player=new YoutubePage();if(page==null||!"com.google.android.youtube".equals(text(page.getPackageName())))return player;
+        android.graphics.Rect screen=new android.graphics.Rect();page.getBoundsInScreen(screen);player.width=screen.width();player.height=screen.height();
+        for(AccessibilityNodeInfo n:nodes(page)){
+            String value=text(n.getText()).trim(),description=text(n.getContentDescription()).trim();
+            if(value.equals("Shorts")||description.equals("Shorts"))player.shorts=true;
+            int role=YoutubeLayout.OTHER;
+            for(String label:new String[]{value,description}){
+                if(FavoriteRules.favoriteButton(label)||FavoriteRules.youtubeSavedEntry("com.google.android.youtube",text(n.getClassName()),label))role=YoutubeLayout.SAVE;
+                else if(FavoriteRules.share(label))role=YoutubeLayout.SHARE;
+                else if(MenuActions.youtubeMore(label,"",n.getViewIdResourceName()))role=YoutubeLayout.MORE;
+                else if(label.matches("(?i)(?:评论|Comments?)(?:[ ,，:：0-9万千].*)?"))role=YoutubeLayout.COMMENT;
+                else if(label.matches("(?i)(?:不喜欢|Dislike)(?:[ ,，:：0-9万千].*)?"))role=YoutubeLayout.DISLIKE;
+                else if(label.matches("(?i)(?:点赞|喜欢|Like)(?:[ ,，:：0-9万千].*)?"))role=YoutubeLayout.LIKE;
+                else if(label.matches("(?i)搜索|Search"))role=YoutubeLayout.SEARCH;
+            }
+            if(role==YoutubeLayout.OTHER&&boundFavorite!=null&&control(n).equals(boundFavorite))role=YoutubeLayout.SAVE;
+            android.graphics.Rect b=new android.graphics.Rect();n.getBoundsInScreen(b);
+            YoutubeLayout.Box box=new YoutubeLayout.Box(b.left-screen.left,b.top-screen.top,b.right-screen.left,b.bottom-screen.top,role);
+            AccessibilityNodeInfo target=n.isClickable()?n:(role==YoutubeLayout.OTHER?null:control(n));
+            if(target!=null&&target.isClickable()&&target.isEnabled()&&!target.isEditable()&&!target.isPassword()){
+                android.graphics.Rect action=new android.graphics.Rect();target.getBoundsInScreen(action);
+                player.controls.add(target);player.boxes.add(new YoutubeLayout.Box(action.left-screen.left,action.top-screen.top,action.right-screen.left,action.bottom-screen.top,role));
+            }
+            if(!value.isEmpty())player.captions.add(new YoutubeLayout.Caption(box,value));
+            if(!description.isEmpty())player.captions.add(new YoutubeLayout.Caption(box,description));
+        }
+        if(!player.shorts&&YoutubeLayout.share(player.boxes,player.width,player.height,true)>=0)player.shorts=true;
+        return player;
+    }
+    private String youtubeCaption(AccessibilityNodeInfo page){YoutubePage p=youtubePage(page);return YoutubeLayout.caption(p.captions,p.boxes,p.width,p.height,p.shorts);}
+    private boolean youtubeSavePanel(AccessibilityNodeInfo page){
+        if(page==null||!"com.google.android.youtube".equals(text(page.getPackageName())))return false;
+        boolean save=false,download=false,report=false,playlist=false;
+        for(AccessibilityNodeInfo n:nodes(page))for(String value:new String[]{text(n.getText()).trim(),text(n.getContentDescription()).trim()}){
+            save|=FavoriteRules.favoriteButton(value)||value.matches("(?i)保存到播放列表|儲存至播放清單|Save to playlist");
+            download|=value.matches("(?is)(?:下载|Download)(?:.*)");report|=value.matches("(?i)举报|Report");
+            playlist|=value.matches("(?i)稍后观看|稍後觀看|Watch later|新建播放列表|创建新的播放列表|New playlist|Create new playlist");
+        }
+        return save&&((download&&report)||playlist);
     }
     private String sourceTitle(AccessibilityNodeInfo page){
         if(page==null)return "";String pkg=text(page.getPackageName());
@@ -349,6 +440,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             }
             unique=DouyinCaption.select(captions);
         }
+        if(unique.isEmpty()&&"com.google.android.youtube".equals(pkg))unique=PageTitles.clean(youtubeCaption(page));
         return unique;
     }
     private List<AccessibilityNodeInfo> wechatArticleNodes(AccessibilityNodeInfo page){
@@ -385,6 +477,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         return Collections.emptyList();
     }
     private boolean actionMenu(AccessibilityNodeInfo page,String pkg){
+        if("com.google.android.youtube".equals(pkg)&&youtubeSavePanel(page))return true;
         if(page==null)return false;boolean favorite=false,other=false,wide=false;android.graphics.Rect screen=new android.graphics.Rect();page.getBoundsInScreen(screen);
         for(AccessibilityNodeInfo n:nodes(page)){
             if("com.tencent.mm".equals(pkg)&&text(n.getClassName()).endsWith("WebView"))return false;
@@ -416,6 +509,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         android.util.DisplayMetrics screen=getResources().getDisplayMetrics();
         if(box.centerY()>screen.heightPixels*.65||box.centerX()<screen.widthPixels*.5)return false;
         if(MenuActions.youtubeMore(text(source.getText()),text(source.getContentDescription()),source.getViewIdResourceName()))return true;
+        for(AccessibilityNodeInfo n=source;n!=null&&compact(n);n=n.getParent())if(!youtubeMoreKey.isEmpty()&&youtubeMoreKey.equals(nodeKey(n)))return true;
         for(AccessibilityNodeInfo n:nodes(source))if(MenuActions.youtubeMore(text(n.getText()),text(n.getContentDescription()),n.getViewIdResourceName()))return true;
         return false;
     }
@@ -463,6 +557,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         // Prefer an exposed title/heading; otherwise keep one substantial article text
         // locally in memory. It is never persisted in diagnostics or sent to a server.
         String title=sourceTitle(root);if(!title.isEmpty())return title;
+        if(root!=null&&"com.google.android.youtube".equals(text(root.getPackageName()))){String caption=youtubeCaption(root);if(!caption.isEmpty())return caption;}
         String fallback="";
         for(AccessibilityNodeInfo n:("com.tencent.mm".equals(text(root==null?null:root.getPackageName()))?wechatContentNodes(root):nodes(root))){
             String value=text(n.getText()).trim().replaceAll("\\s+"," ");
@@ -487,6 +582,10 @@ public class FavoriteCaptureService extends AccessibilityService {
         long now=SystemClock.elapsedRealtime();
         AccessibilityNodeInfo page=root();
         if(wait.ready(now)){
+            if("com.google.android.youtube".equals(pendingPackage)&&youtubeSavePanel(page)&&youtubePanelBacks<2){
+                youtubePanelBacks++;state("正在关闭 YouTube 保存菜单并核对原视频");
+                if(performGlobalAction(GLOBAL_ACTION_BACK)){handler.postDelayed(confirm,350);return;}
+            }
             if("com.tencent.mm".equals(pendingPackage)&&wechatAllowed(page)&&button(true)!=null){
                 phase=2;copyTimeout=8000;copyStarted=now;
                 state("公众号收藏已确认，正在从文章菜单取得原链接");handler.post(pollCopy);return;
@@ -516,6 +615,10 @@ public class FavoriteCaptureService extends AccessibilityService {
     }
     private AccessibilityNodeInfo button(boolean copy){
         AccessibilityNodeInfo root=root();
+        if(!copy&&phase==1&&"com.google.android.youtube".equals(pendingPackage)&&sameScene(root)){
+            YoutubePage player=youtubePage(root);int share=YoutubeLayout.share(player.boxes,player.width,player.height,player.shorts);
+            if(share>=0)return player.controls.get(share);
+        }
         AccessibilityNodeInfo learned=copy?null:FavoriteBindings.find(this,pendingPackage,"share",root,nodes(root));
         if(learned!=null&&!"com.xingin.xhs".equals(pendingPackage))return learned;
         Map<String,AccessibilityNodeInfo> matches=new LinkedHashMap<>();
@@ -538,6 +641,13 @@ public class FavoriteCaptureService extends AccessibilityService {
         for(AccessibilityNodeInfo target:targets){android.graphics.Rect b=new android.graphics.Rect();target.getBoundsInScreen(b);boxes.add(new CaptureTargets.Box(b.left,b.top,b.right,b.bottom));}
         int unique=CaptureTargets.unique(boxes);
         if(!copy&&matches.isEmpty()&&learned!=null)return learned;
+        if(!copy&&unique<0){
+            AccessibilityNodeInfo selected=selectedControl(root,true);if(selected!=null)return selected;
+            if("com.google.android.youtube".equals(pendingPackage)&&phase==1&&sameScene(root)){
+                YoutubePage player=youtubePage(root);int share=YoutubeLayout.share(player.boxes,player.width,player.height,player.shorts);
+                if(share>=0)return player.controls.get(share);
+            }
+        }
         // Nested wrappers can name the same action; distinct controls still require a unique match.
         return unique>=0?targets.get(unique):(!copy?zhihuToolbar(matches.values(),root):null);
     }
@@ -626,7 +736,7 @@ public class FavoriteCaptureService extends AccessibilityService {
             if(count>=70||out.length()>10000)break;
         }
         out.append("匹配区域控件数：").append(count);
-        getPrefs(this).edit().putString("pageDiagnostic:"+FavoriteRules.PACKAGES[FavoriteRules.platform(pkg)],out.toString()).apply();
+        getPrefs(this).edit().putString("pageDiagnostic:"+FavoriteRules.bindingProfile(pkg),out.toString()).apply();
     }
     private void manualShare(){
         recordPageDiagnostic();
@@ -649,7 +759,7 @@ public class FavoriteCaptureService extends AccessibilityService {
         handler.postDelayed(()->fail("按钮适配已超时，请重新开始"),60000);
     }
     private void learnClick(AccessibilityEvent event,String pkg){
-        if(!learningArmed||!FavoriteRules.samePlatform(pendingPackage,pkg))return;
+        if(!learningArmed||!FavoriteRules.bindingProfile(pendingPackage).equals(FavoriteRules.bindingProfile(pkg)))return;
         if(event.getEventType()!=AccessibilityEvent.TYPE_VIEW_CLICKED&&event.getEventType()!=AccessibilityEvent.TYPE_VIEW_LONG_CLICKED)return;
         AccessibilityNodeInfo target=event.getSource();if(target==null){state("系统未提供点击控件，请再点一次按钮");return;}
         if(("com.tencent.mm".equals(pkg)&&wechatMoreControl(target))||("com.google.android.youtube".equals(pkg)&&youtubeOverflow(target))){state("已识别更多菜单，请继续点其中的收藏 / 保存按钮");return;}

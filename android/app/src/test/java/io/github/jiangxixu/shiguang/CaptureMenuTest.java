@@ -22,6 +22,13 @@ public class CaptureMenuTest {
         state.clear();state.observe("com.tencent.mm",7,"旧文章","旧文章",1000);state.openMenu("com.tencent.mm",4000);
         assertNull(state.source("com.tencent.mm",4000));
     }
+    @Test public void youtubeSaveInsideMoreRetainsOnlyRecentOriginalVideo(){
+        MenuOrigin state=new MenuOrigin();state.observe("com.google.android.youtube",7,"原视频标题","原视频标题",1000);
+        assertEquals(7,state.recentVideo("com.google.android.youtube",10000).window);
+        assertNull(state.recentVideo("other",10000));assertNull(state.recentVideo("com.google.android.youtube",31001));
+        state.openMenu("com.google.android.youtube",1200);state.observe("com.google.android.youtube",9,"","保存",1500);
+        assertEquals("原视频标题",state.recentVideo("com.google.android.youtube",10000).anchor);
+    }
     @Test public void webArticleEvidenceNeedsHeadingAndFooterOrTwoDistinctFooterMarkers(){
         assertTrue(MenuActions.articleContext(Arrays.asList("阅读原文","在看"),false));
         assertTrue(MenuActions.articleContext(Arrays.asList("写留言"),true));

@@ -2,6 +2,11 @@ package io.github.jiangxixu.shiguang;
 public class FavoriteRulesTest {
     static void check(boolean condition){if(!condition)throw new AssertionError();}
     public static void main(String[] args){
+        check(FavoriteRules.platform("com.ss.android.yumme.video")==3);
+        check(FavoriteRules.platformName("com.ss.android.yumme.video").equals("抖音精选"));
+        check(FavoriteRules.contentUrl("com.ss.android.yumme.video","https://v.douyin.com/ABC123/"));
+        check(!FavoriteRules.bindingProfile("com.ss.android.yumme.video").equals(FavoriteRules.bindingProfile("com.ss.android.ugc.aweme")));
+        check(FavoriteRules.bindingProfile("com.ss.android.ugc.aweme.lite").equals(FavoriteRules.bindingProfile("com.ss.android.ugc.aweme")));
         for(String label:new String[]{"将视频保存到播放列表","Save video to a playlist, button","未选中，保存到播放列表。","儲存到播放清單","收藏文章"})check(FavoriteRules.favoriteButton(label));
         for(String label:new String[]{"分享视频","取消收藏","不保存到播放列表","保存到相册","下载视频"})check(!FavoriteRules.favoriteButton(label));
         check(FavoriteRules.roleId("com.xingin.xhs","com.xingin.xhs:id/moreOperateIV","share"));

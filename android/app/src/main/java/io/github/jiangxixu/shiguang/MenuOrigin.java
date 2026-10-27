@@ -19,5 +19,6 @@ final class MenuOrigin {
         if(opened==null&&observed!=null&&observed.pkg.equals(pkg)&&now>=observed.at&&now-observed.at<=2000){opened=observed;until=now+30000;}
     }
     Source source(String pkg,long now){return opened!=null&&opened.pkg.equals(pkg)&&now<=until?opened:null;}
+    Source recentVideo(String pkg,long now){Source source=source(pkg,now);return source!=null?source:(observed!=null&&observed.pkg.equals(pkg)&&now>=observed.at&&now-observed.at<=30000?observed:null);}
     void clear(){observed=null;opened=null;until=0;}
 }
