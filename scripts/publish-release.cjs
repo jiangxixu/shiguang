@@ -8,7 +8,7 @@ async function main(){
  const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'shiguang-release','X-GitHub-Api-Version':'2022-11-28'};
  const existing=await fetch(base+'/releases/tags/'+tag,{headers});
  if(existing.status!==404)throw Error('This release tag already exists or cannot be checked. Bump versionName before publishing.');
- const notes="改善后台同步及封面补全时的列表刷新，仅更新变化的收藏卡片，减少页面闪烁。覆盖安装保留数据。";
+ const notes="修复电脑扩展收藏封面提取：小红书当前笔记图片、知乎正文延迟加载图片，以及通用 Open Graph、Twitter、视频 poster 和结构化数据封面。统一快捷键、工具栏和右键入口，批量采集保留关联卡片封面。重复收藏可补回缺失封面并保留原笔记、分类。更新扩展后需在扩展管理页重新加载，并刷新来源网页及拾光网页。旧收藏可在原内容页再次收藏补封面。自动测试通过，未逐个平台登录实测。";
  const response=await fetch(base+'/releases',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tag_name:tag,target_commitish:process.env.GITHUB_SHA,name:'拾光 '+version+' · 1.6.27 基础修复测试包',body:notes,draft:false,prerelease:true})});
  if(!response.ok)throw Error('Release creation failed: '+response.status);
  const release=await response.json();

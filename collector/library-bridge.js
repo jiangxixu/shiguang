@@ -12,21 +12,23 @@ function stopOldBridge(){
 async function drain(){
  if(disconnected||draining)return;draining=true;
  try{
-  let totalAdded=0;
+  let totalAdded=0,updated=false;
   while(true){
   const response=await chrome.runtime.sendMessage({type:'SHIGUANG_PENDING',owner:localStorage.getItem('shiguang.cloud.owner')});
   if(response.error)throw Error(response.error);
   if(!response.items?.length)break;
+  const before=localStorage.getItem(ShiguangCapture.KEY);
   const result=ShiguangCapture.save(localStorage,response.items);
+  updated=updated||before!==localStorage.getItem(ShiguangCapture.KEY);
   const ack=await chrome.runtime.sendMessage({type:'SHIGUANG_ACK',ids:response.items.map(x=>x.id)});
   if(!ack.ok)throw Error('归档确认失败');
   totalAdded+=result.added;
   }
   const entries=JSON.parse(localStorage.getItem(ShiguangCapture.KEY)||'[]');
   await chrome.runtime.sendMessage({type:'SHIGUANG_CATEGORIES',owner:localStorage.getItem('shiguang.cloud.owner'),tags:[...new Set(entries.flatMap(item=>item.tags||[]))]});
-  if(!totalAdded)return;
+  if(!updated)return;
   window.dispatchEvent(new StorageEvent('storage',{key:ShiguangCapture.KEY,newValue:localStorage.getItem(ShiguangCapture.KEY)}));
-  const note=document.createElement('div');note.textContent=`拾光：快捷收藏已归入知识库（新增 ${totalAdded} 条）`;
+  const note=document.createElement('div');note.textContent=totalAdded?`拾光：快捷收藏已归入知识库（新增 ${totalAdded} 条）`:'拾光：已补全收藏信息';
   Object.assign(note.style,{position:'fixed',bottom:'24px',right:'24px',zIndex:'2147483647',background:'#354936',color:'#fff',padding:'14px 20px',borderRadius:'8px',font:'14px sans-serif'});
   document.body.append(note);setTimeout(()=>note.remove(),4000);
  }catch(e){

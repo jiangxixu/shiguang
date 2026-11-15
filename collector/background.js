@@ -1,5 +1,5 @@
 'use strict';
-importScripts('core.js','cloud-config.js','auth-input.js','supabase.js','cloud-worker.js');
+importScripts('page-metadata.js','core.js','cloud-config.js','auth-input.js','supabase.js','cloud-worker.js');
 const SITE='https://jiangxixu.github.io/shiguang/';
 const QUEUE='quickCaptureQueue';
 let serial=Promise.resolve();
@@ -22,8 +22,8 @@ async function tell(tabId,text){
 async function openCapture(tab,info={}){
  try{
   if(!tab.id)throw Error('没有活动网页');
-  const result=info.raw||((await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>({url:location.href,title:document.title,thumbnail:document.querySelector('meta[property="og:image"],meta[name="twitter:image"]')?.content||'',selection:getSelection().toString().slice(0,5000),createdAt:new Date().toISOString()})}))[0].result);
-  if(info.linkUrl){result.url=info.linkUrl;result.title=info.selectionText||info.linkUrl;result.thumbnail='';}
+  const result=info.raw||((await chrome.scripting.executeScript({target:{tabId:tab.id},func:ShiguangReadPage,args:[info.linkUrl||null]}))[0].result);
+  if(info.linkUrl){result.url=info.linkUrl;result.title=info.selectionText||result.title||info.linkUrl;}
   if(!SG.safeUrl(result.url))throw Error('请在普通网页上收藏');
   const ownership=await chrome.storage.local.get('shiguang.extension.owner');
   const id=crypto.randomUUID();
@@ -59,7 +59,8 @@ async function saveDraft(message){
   if(owner!==draft.owner)throw Error('账号已切换，请重新打开收藏窗口');
   const item=SG.normalize({...draft.raw,tags:String(message.tags||''),notes:[String(message.reason||'').trim(),draft.raw.selection?'摘录：'+draft.raw.selection:''].filter(Boolean).join('\n\n')});
   if(!item)throw Error('链接无效，尚未保存');if(owner)item.cloudOwner=owner;
-  const queue=await pending();const duplicate=queue.some(x=>SG.canonical(x.url)===item.url&&(x.cloudOwner||null)===owner);
+  const queue=await pending();const existing=queue.find(x=>SG.canonical(x.url)===item.url&&(x.cloudOwner||null)===owner),duplicate=!!existing;
+  if(existing&&!existing.thumbnail&&item.thumbnail){existing.thumbnail=item.thumbnail;delete existing.uploadedFor;await chrome.storage.local.set({[QUEUE]:queue});}
   if(!duplicate){queue.push(item);await chrome.storage.local.set({[QUEUE]:queue});}
   await rememberCategories(owner,item.tags||[]);
   delete drafts[message.id];await chrome.storage.local.set({captureDrafts:drafts});

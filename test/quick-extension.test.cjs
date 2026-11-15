@@ -2,8 +2,8 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const SG=require('../dist/core.js'),Capture=require('../dist/capture-store.js');
 const path=require('node:path');
 function worker(){
- const events={},db={},listeners=[],windows=[],api={commands:{onCommand:{addListener:fn=>events.command=fn}},contextMenus:{onClicked:{addListener:fn=>events.menu=fn}},windows:{create:async options=>windows.push(options)},alarms:{create(){},onAlarm:{addListener(){}}},runtime:{id:'test-extension',getURL:name=>'chrome-extension://test-extension/'+name,onMessage:{addListener:fn=>listeners.push(fn)},onInstalled:{addListener(){}},onStartup:{addListener(){}}},action:{onClicked:{addListener:fn=>events.click=fn},setBadgeBackgroundColor:async()=>{},setBadgeText:async()=>{},setTitle:async()=>{}},tabs:{query:async query=>query.active?[{id:1}]:[]},storage:{local:{get:async key=>structuredClone({[key]:db[key]}),set:async values=>Object.assign(db,structuredClone(values))}},scripting:{executeScript:async options=>options.args?[]:[{result:{url:'https://www.bilibili.com/video/BV123?vd_source=a',title:'学习视频',selection:'选中的内容'}}]}};
- const ctx={URL,chrome:api,importScripts(){},SG,console,crypto:require('node:crypto').webcrypto,pushCloud:async()=>({signedIn:false})};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../collector/background.js'),'utf8'),ctx);
+ const events={},db={},listeners=[],windows=[],api={commands:{onCommand:{addListener:fn=>events.command=fn}},contextMenus:{onClicked:{addListener:fn=>events.menu=fn}},windows:{create:async options=>windows.push(options)},alarms:{create(){},onAlarm:{addListener(){}}},runtime:{id:'test-extension',getURL:name=>'chrome-extension://test-extension/'+name,onMessage:{addListener:fn=>listeners.push(fn)},onInstalled:{addListener(){}},onStartup:{addListener(){}}},action:{onClicked:{addListener:fn=>events.click=fn},setBadgeBackgroundColor:async()=>{},setBadgeText:async()=>{},setTitle:async()=>{}},tabs:{query:async query=>query.active?[{id:1}]:[]},storage:{local:{get:async key=>structuredClone({[key]:db[key]}),set:async values=>Object.assign(db,structuredClone(values))}},scripting:{executeScript:async options=>options.func.name!=='ShiguangReadPage'?[]:[{result:{url:'https://www.bilibili.com/video/BV123?vd_source=a',title:'学习视频',selection:'选中的内容'}}]}};
+ const ctx={URL,chrome:api,ShiguangReadPage:require('../collector/page-metadata.js'),importScripts(){},SG,console,crypto:require('node:crypto').webcrypto,pushCloud:async()=>({signedIn:false})};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../collector/background.js'),'utf8'),ctx);
  const sender={id:'test-extension',tab:{url:'https://jiangxixu.github.io/shiguang/'}};
  const send=(data,from)=>new Promise(resolve=>{let handled=false;for(const listener of listeners)if(listener(data,from,resolve)===true)handled=true;if(!handled)resolve(undefined);});
  const message=data=>send(data,sender);
@@ -56,6 +56,13 @@ test('page shortcut uses the content sender URL without requiring sensitive tab 
  assert.equal(result.ok,true);const id=Object.keys(w.db.captureDrafts)[0];assert.equal(w.db.captureDrafts[id].raw.url,'https://example.com/tutorial');
  assert.equal((await w.editor({type:'SHIGUANG_CAPTURE_SAVE',id,tags:'',reason:''})).ok,true);
  const items=(await w.message({type:'SHIGUANG_PENDING'})).items;assert.equal(items[0].notes,'');assert.equal(items[0].tags.length,0);
+});
+
+test('shortcut covers survive confirmation and duplicate drafts enrich the queue without replacing notes',async()=>{
+ const w=worker(),sender={id:'test-extension',url:'https://www.zhihu.com/question/1/answer/2',tab:{id:3}};
+ async function capture(thumbnail,reason){await w.send({type:'SHIGUANG_SHORTCUT',url:sender.url,title:'回答标题',thumbnail},sender);const id=Object.keys(w.db.captureDrafts).at(-1);assert.equal((await w.editor({type:'SHIGUANG_CAPTURE_SAVE',id,reason,tags:'学习'})).ok,true);}
+ await capture('','原笔记');await capture('https://picx.zhimg.com/article.jpg','不覆盖');const items=(await w.message({type:'SHIGUANG_PENDING'})).items;
+ assert.equal(items.length,1);assert.equal(items[0].thumbnail,'https://picx.zhimg.com/article.jpg');assert.equal(items[0].notes,'原笔记');
 });
 
 test('SPA shortcuts capture the current same-origin topic URL and reject a different origin',async()=>{
